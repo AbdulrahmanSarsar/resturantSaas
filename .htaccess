@@ -1,0 +1,66 @@
+RewriteEngine On
+
+# دعم UTF-8 للـ URLs العربية
+Options +FollowSymLinks
+RewriteOptions inherit
+
+# ============================================================
+# BRANCH-AWARE URLS (v2) — أولوية عالية، تُطابق أولاً
+# Pattern: /menu/{slug}/{branch-slug}/...
+# [^/]+ يقبل أي character بما فيها العربية
+# ============================================================
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/([^/]+)/dish/([0-9]+)$ /menu/dish.php?slug=$1&branch=$2&id=$3 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/([^/]+)/cart$ /menu/cart.php?slug=$1&branch=$2 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/([^/]+)/order/([0-9]+)$ /menu/order_track.php?slug=$1&branch=$2&id=$3 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/([^/]+)/rate/([0-9]+)$ /menu/rate_order.php?slug=$1&branch=$2&id=$3 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/([^/]+)/invoice/([0-9]+)$ /menu/invoice.php?slug=$1&branch=$2&id=$3 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+# /menu/{slug}/{branch} — صفحة المنيو الرئيسية للفرع
+# شرط: الـ segment الثاني ليس: dish, cart, order, rate, invoice
+RewriteCond %{REQUEST_URI} !^/menu/[^/]+/(dish|cart|order|rate|invoice)
+RewriteRule ^menu/([^/]+)/([^/]+)$ /menu/index.php?slug=$1&branch=$2 [QSA,L]
+
+# ============================================================
+# LEGACY URLS (v1) — backward compatibility
+# ============================================================
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)$ /menu/index.php?slug=$1 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/dish/([0-9]+)$ /menu/dish.php?slug=$1&id=$2 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/cart$ /menu/cart.php?slug=$1 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/order/([0-9]+)$ /menu/order_track.php?slug=$1&id=$2 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/rate/([0-9]+)$ /menu/rate_order.php?slug=$1&id=$2 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^menu/([^/]+)/invoice/([0-9]+)$ /menu/invoice.php?slug=$1&id=$2 [QSA,L]
