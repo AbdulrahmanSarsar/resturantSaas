@@ -19,7 +19,10 @@ if(!function_exists('fmt_price')) {
     }
 }
 
+// ===== Branch Filter =====
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
 
+// POST: تحديث حالة الطلب
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
     $pdo->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=? AND restaurant_id=?")
         ->execute([$_POST['status'], $_POST['order_id'], $rid]);
@@ -33,14 +36,21 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
 $filter    = $_GET['status'] ?? 'all';
 $date_mode = $_GET['date']   ?? 'today';
 
+// بناء الـ WHERE مع branch filter
 $where  = 'WHERE restaurant_id = ?';
 $params = [$rid];
+if($active_branch_id) { $where .= ' AND branch_id = ?'; $params[] = $active_branch_id; }
 if($date_mode !== 'all') { $where .= ' AND DATE(created_at) = CURDATE()'; }
 if($filter !== 'all')    { $where .= ' AND status = ?'; $params[] = $filter; }
 
 $orders = $pdo->prepare("SELECT * FROM orders $where ORDER BY created_at DESC");
 $orders->execute($params);
 $orders = $orders->fetchAll();
+
+// إحصائيات — مع branch filter
+$stats_where  = 'WHERE restaurant_id=?';
+$stats_params = [$rid];
+if($active_branch_id) { $stats_where .= ' AND branch_id = ?'; $stats_params[] = $active_branch_id; }
 
 $stats = $pdo->prepare("
     SELECT COUNT(*) as total,
@@ -49,14 +59,32 @@ $stats = $pdo->prepare("
         SUM(status='ready') as ready,
         SUM(status='delivered' AND DATE(created_at)=CURDATE()) as delivered_today,
         COALESCE(SUM(CASE WHEN status='delivered' AND DATE(created_at)=CURDATE() THEN total_price END),0) as revenue_today
-    FROM orders WHERE restaurant_id=?
+    FROM orders $stats_where
 ");
-$stats->execute([$rid]);
+$stats->execute($stats_params);
 $stats = $stats->fetch();
+
+// اسم الفرع النشط للعرض
+$branch_name = '';
+if($active_branch_id) {
+    $bn = $pdo->prepare("SELECT name FROM branches WHERE id=?");
+    $bn->execute([$active_branch_id]);
+    $branch_name = $bn->fetchColumn() ?: '';
+}
 
 require_once 'sidebar.php';
 ?>
 <style>
+/* ===== BRANCH BADGE ===== */
+.branch-active-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    background: color-mix(in srgb, var(--p) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--p) 25%, transparent);
+    color: var(--p); margin-bottom: 14px;
+}
+.branch-active-badge svg { width: 12px; height: 12px; }
+
 /* ===== STAT PILLS ===== */
 .stat-pills{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
 .stat-pill{
@@ -86,125 +114,58 @@ require_once 'sidebar.php';
 
 /* ===== ORDER CARDS ===== */
 .orders-list{display:flex;flex-direction:column;gap:12px;}
-
 .order-card{
     background:var(--bg2);border:1px solid var(--line);
     border-radius:18px;overflow:hidden;
-    animation:cardIn .35s cubic-bezier(.22,1,.36,1) both;
-    display:flex;flex-direction:column;
+    animation:cardIn .4s cubic-bezier(.22,1,.36,1) both;
+    transition:box-shadow .2s;
 }
-@keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:none;}}
+.order-card:hover{box-shadow:var(--shadow2);}
+.order-card.status-pending  {border-right:3px solid #F59E0B;}
+.order-card.status-confirmed{border-right:3px solid #3B82F6;}
+.order-card.status-preparing{border-right:3px solid #8B5CF6;}
+.order-card.status-ready    {border-right:3px solid #22C55E;}
+.order-card.status-delivered{border-right:3px solid var(--ink3);}
+.order-card.status-cancelled{border-right:3px solid #EF4444;opacity:.6;}
+.order-card.new-flash{animation:newFlash .6s ease 3,cardIn .4s both;}
+@keyframes newFlash{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 8px rgba(255,107,53,.18)}}
 
-/* شريط اللون على اليمين */
-.order-card::before{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;border-radius:0 18px 18px 0;}
-.order-card{position:relative;}
-.order-card.status-pending::before{background:#F59E0B;}
-.order-card.status-confirmed::before{background:#3B82F6;}
-.order-card.status-preparing::before{background:#8B5CF6;}
-.order-card.status-ready::before{background:#22C55E;}
-.order-card.status-delivered::before{background:var(--ink3);}
-.order-card.status-cancelled::before{background:#EF4444;opacity:.5;}
-.order-card.status-cancelled{opacity:.55;}
-
-/* HEADER */
-.order-head{
-    display:flex;align-items:center;gap:8px;
-    padding:13px 18px;flex-wrap:wrap;
-    border-bottom:1px solid var(--line);
-    background:var(--bg3);
-}
-.order-num{font-family:'Fraunces',serif;font-size:17px;font-weight:900;color:var(--ink);}
-.order-table-chip{background:color-mix(in srgb,var(--p) 10%,transparent);border:1px solid color-mix(in srgb,var(--p) 20%,transparent);color:var(--p);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;}
-.order-customer{font-size:12px;color:var(--ink2);font-weight:500;display:flex;align-items:center;gap:4px;}
-.order-customer svg{width:11px;height:11px;}
-.order-head-right{display:flex;align-items:center;gap:10px;margin-right:auto;}
+/* ORDER HEAD */
+.order-head{display:flex;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap;}
+.order-num{font-family:'Fraunces',serif;font-size:16px;font-weight:900;color:var(--ink);}
+.order-table-chip{background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.2);color:var(--p);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;}
+.order-customer{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink2);font-weight:600;}
+.order-customer svg{width:12px;height:12px;}
+.order-head-right{margin-right:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .order-time{font-size:11px;color:var(--ink2);font-weight:600;}
-.order-total{font-family:'Fraunces',serif;font-size:18px;font-weight:900;color:var(--p);}
+.order-total{font-family:'Fraunces',serif;font-size:15px;font-weight:900;color:var(--ink);}
+.status-badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;}
+.badge-pending  {background:rgba(245,158,11,.12);color:#F59E0B;}
+.badge-confirmed{background:rgba(59,130,246,.12);color:#3B82F6;}
+.badge-preparing{background:rgba(139,92,246,.12);color:#8B5CF6;}
+.badge-ready    {background:rgba(34,197,94,.12);color:#22C55E;}
+.badge-delivered{background:var(--bg3);color:var(--ink2);}
+.badge-cancelled{background:rgba(239,68,68,.1);color:#EF4444;}
 
-/* STATUS BADGE */
-.status-badge{
-    display:inline-flex;align-items:center;gap:5px;
-    padding:4px 11px;border-radius:20px;
-    font-size:11px;font-weight:800;
-}
-.badge-pending  {background:rgba(245,158,11,.12);color:#F59E0B;border:1px solid rgba(245,158,11,.2);}
-.badge-confirmed{background:rgba(59,130,246,.12);color:#3B82F6;border:1px solid rgba(59,130,246,.2);}
-.badge-preparing{background:rgba(139,92,246,.12);color:#8B5CF6;border:1px solid rgba(139,92,246,.2);}
-.badge-ready    {background:rgba(34,197,94,.12);color:#22C55E;border:1px solid rgba(34,197,94,.2);}
-.badge-delivered{background:var(--bg3);color:var(--ink2);border:1px solid var(--line);}
-.badge-cancelled{background:rgba(239,68,68,.08);color:#EF4444;border:1px solid rgba(239,68,68,.15);}
-
-/* ITEMS TABLE */
-.order-items{padding:12px 18px;border-bottom:1px solid var(--line);}
-.order-item{
-    display:flex;align-items:flex-start;justify-content:space-between;
-    gap:10px;padding:8px 0;
-    border-bottom:1px solid var(--line);
-}
+/* ORDER ITEMS */
+.order-items{padding:0 16px;}
+.order-item{display:flex;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);}
 .order-item:last-child{border-bottom:none;}
 .order-item-main{flex:1;min-width:0;}
-.order-item-name{
-    font-size:13px;font-weight:700;color:var(--ink);
-    margin-bottom:4px;
-}
-.order-item-opts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;}
-.order-item-opt{
-    display:inline-flex;align-items:center;gap:3px;
-    background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);
-    color:#A78BFA;padding:2px 8px;border-radius:8px;
-    font-size:10px;font-weight:700;
-}
-.order-item-opt::before{content:'◆';font-size:8px;}
-.order-item-note{
-    display:inline-flex;align-items:center;gap:5px;
-    background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);
-    border-radius:8px;padding:3px 8px;
-    font-size:11px;color:#F59E0B;font-weight:600;
-    margin-top:2px;
-}
-.order-item-qty{
-    font-family:'Fraunces',serif;
-    font-size:14px;font-weight:900;
-    background:var(--p);color:#fff;
-    padding:3px 10px;border-radius:10px;
-    flex-shrink:0;margin-top:1px;
-    white-space:nowrap;
-}
+.order-item-name{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.order-item-opts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:3px;}
+.order-item-opt{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);color:#A78BFA;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;}
+.order-item-notes{font-size:11px;color:#F59E0B;font-weight:600;}
+.order-item-qty{font-family:'Fraunces',serif;font-size:14px;font-weight:900;color:var(--p);white-space:nowrap;margin-top:2px;}
 
-/* FOOTER */
-.order-footer{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:11px 18px;gap:10px;flex-wrap:wrap;
-}
-.order-notes-wrap{
-    display:flex;align-items:flex-start;gap:6px;
-    font-size:12px;color:var(--ink2);flex:1;
-}
-.order-notes-wrap svg{width:12px;height:12px;flex-shrink:0;margin-top:1px;color:#F59E0B;}
+/* ORDER FOOTER */
+.order-footer{padding:10px 16px;border-top:1px solid var(--line);background:var(--bg3);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.order-notes{padding:8px 16px;background:rgba(245,158,11,.06);border-top:1px solid rgba(245,158,11,.12);font-size:12px;color:#F59E0B;display:flex;gap:6px;align-items:flex-start;}
+.order-notes svg{width:13px;height:13px;flex-shrink:0;margin-top:1px;}
 
-/* TAX ROW */
-.order-tax-row{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:6px 18px;background:var(--bg3);
-    border-top:1px solid var(--line);
-    font-size:12px;
-}
-.order-tax-items{display:flex;flex-wrap:wrap;gap:6px;}
-.order-tax-chip{
-    display:inline-flex;align-items:center;gap:4px;
-    background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);
-    color:#818CF8;padding:2px 8px;border-radius:8px;
-    font-size:11px;font-weight:700;
-}
-
-/* ACTIONS */
+/* STATUS BUTTONS */
 .status-btns{display:flex;gap:6px;flex-wrap:wrap;}
-.status-btn{
-    padding:8px 14px;border-radius:10px;border:none;
-    font-size:12px;font-weight:800;cursor:pointer;
-    font-family:'Tajawal',sans-serif;transition:all .2s;
-    white-space:nowrap;display:flex;align-items:center;gap:5px;
-}
+.status-btn{padding:8px 14px;border-radius:10px;border:none;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:5px;}
 .status-btn svg{width:12px;height:12px;}
 .status-btn:active{transform:scale(.96);}
 .btn-confirm{background:rgba(59,130,246,.12);color:#3B82F6;border:1px solid rgba(59,130,246,.2);}
@@ -227,12 +188,19 @@ require_once 'sidebar.php';
 
 <div class="main">
 
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
     <div>
         <div class="page-title">الطلبات</div>
         <div class="page-subtitle">إدارة طلبات مطعمك بالوقت الحقيقي</div>
     </div>
 </div>
+
+<?php if($active_branch_id && $branch_name): ?>
+<div class="branch-active-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    📍 <?= htmlspecialchars($branch_name) ?>
+</div>
+<?php endif; ?>
 
 <!-- Stat Pills -->
 <div class="stat-pills">
@@ -289,11 +257,9 @@ require_once 'sidebar.php';
     $status_icons  = ['pending'=>'⏳','confirmed'=>'✓','preparing'=>'⚡','ready'=>'🍽️','delivered'=>'✅','cancelled'=>'❌'];
 
     foreach($orders as $idx => $o):
-        $items = $pdo->prepare("SELECT * FROM order_items WHERE order_id=?");
-        $items->execute([$o['id']]);
-        $items = $items->fetchAll();
-
-        // ضرائب الطلب
+        $items_stmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id=?");
+        $items_stmt->execute([$o['id']]);
+        $items = $items_stmt->fetchAll();
         $order_taxes = [];
         if(!empty($o['tax_details'])) {
             $order_taxes = json_decode($o['tax_details'], true) ?: [];
@@ -333,7 +299,6 @@ require_once 'sidebar.php';
                         <?php endif; ?>
                         <?= htmlspecialchars($item['dish_name']) ?>
                     </div>
-
                     <?php if(!empty($opts)): ?>
                     <div class="order-item-opts">
                         <?php foreach($opts as $opt): ?>
@@ -341,9 +306,8 @@ require_once 'sidebar.php';
                         <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
-
-                    <?php if(!empty($item['notes'])): ?>
-                    <div class="order-item-note">📝 <?= htmlspecialchars($item['notes']) ?></div>
+                    <?php if($item['notes']): ?>
+                    <div class="order-item-notes">📝 <?= htmlspecialchars($item['notes']) ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="order-item-qty">×<?= $item['quantity'] ?></div>
@@ -351,122 +315,116 @@ require_once 'sidebar.php';
             <?php endforeach; ?>
         </div>
 
-        <!-- TAXES -->
-        <?php if(!empty($order_taxes)): ?>
-        <div class="order-tax-row">
-            <div class="order-tax-items">
-                <?php foreach($order_taxes as $tax): ?>
-                <span class="order-tax-chip">
-                    <?= htmlspecialchars($tax['name']) ?>
-                    <span style="opacity:.7;"><?= $tax['type']==='percentage'?$tax['value'].'%':'$'.number_format($tax['value'],2) ?></span>
-                    → $<?= number_format($tax['amount'],2) ?>
-                </span>
-                <?php endforeach; ?>
-            </div>
+        <!-- NOTES -->
+        <?php if($o['customer_notes']): ?>
+        <div class="order-notes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <?= htmlspecialchars($o['customer_notes']) ?>
         </div>
         <?php endif; ?>
 
         <!-- FOOTER -->
         <div class="order-footer">
-            <div class="order-notes-wrap">
-                <?php if($o['customer_notes']): ?>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <?= htmlspecialchars($o['customer_notes']) ?>
-                <?php endif; ?>
-            </div>
             <div class="status-btns">
-                <?php foreach($status_next[$o['status']]??[] as [$ns,$nl,$nc]): ?>
-                <button class="status-btn <?= $nc ?>" onclick="updateStatus(<?= $o['id'] ?>,'<?= $ns ?>',this)">
-                    <?= $nl ?>
+                <?php foreach($status_next[$o['status']] ?? [] as [$next_status, $label, $btn_class]): ?>
+                <button class="status-btn <?= $btn_class ?>" onclick="updateStatus(<?= $o['id'] ?>,'<?= $next_status ?>',this)">
+                    <?= $label ?>
                 </button>
                 <?php endforeach; ?>
             </div>
+            <?php if(!empty($order_taxes)): ?>
+            <div style="margin-right:auto;font-size:11px;color:var(--ink2);font-weight:600;">
+                <?php foreach($order_taxes as $tax): ?>
+                <span><?= htmlspecialchars($tax['name']) ?>: <?= fmt_price($tax['amount']??0,$cur_symbol,$cur_decimals,$cur_prefix) ?></span>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
     </div>
 <?php endforeach; endif; ?>
 </div>
+
 </div>
 
 <script>
-function updateStatus(orderId,status,btn){
-    btn.classList.add('loading'); btn.disabled=true;
-    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`order_id=${orderId}&status=${status}&ajax=1`})
-    .then(r=>r.json())
-    .then(d=>{ if(d.success) location.reload(); })
-    .catch(()=>{ btn.classList.remove('loading'); btn.disabled=false; });
+function updateStatus(orderId, status, btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    const orig = btn.textContent;
+    btn.textContent = '...';
+
+    fetch('', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `order_id=${orderId}&status=${status}&ajax=1`
+    })
+    .then(r => r.json())
+    .then(d => {
+        if(d.success) {
+            const card = document.getElementById('order-' + orderId);
+            if(card) {
+                card.style.transition = 'opacity .3s, transform .3s';
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(-10px)';
+                setTimeout(() => { card.remove(); }, 300);
+            }
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btn.textContent = orig;
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.textContent = orig;
+    });
 }
 
-let audioCtx=null, userInteracted=false, notifGranted=false;
-['click','touchstart','keydown'].forEach(ev=>
-    document.addEventListener(ev,()=>{
-        userInteracted=true;
-        if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
-        if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
-        if(sessionStorage.getItem('pendingSound')){ sessionStorage.removeItem('pendingSound'); setTimeout(_playBeep,100); }
-    },{passive:true})
+// Sound
+let audioCtx = null, userInteracted = false;
+['click','touchstart'].forEach(ev =>
+    document.addEventListener(ev, () => {
+        userInteracted = true;
+        if(!audioCtx) { try { audioCtx = new(window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
+    }, {passive: true, once: true})
 );
-if('Notification' in window){
-    if(Notification.permission==='granted') notifGranted=true;
-    else if(Notification.permission!=='denied'){
-        Notification.requestPermission().then(p=>{ notifGranted=(p==='granted'); });
-    }
-}
-function _playBeep(){
+function _beep() {
     if(!audioCtx) return;
-    [[880,0,.3],[1100,.22,.65]].forEach(([f,s,e])=>{
-        const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    [[523,0,.15],[659,.1,.15],[784,.2,.3]].forEach(([f,s,e]) => {
+        const o=audioCtx.createOscillator(), g=audioCtx.createGain();
         o.connect(g); g.connect(audioCtx.destination);
         o.frequency.value=f; o.type='sine';
-        g.gain.setValueAtTime(.4,audioCtx.currentTime+s);
-        g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+e);
+        g.gain.setValueAtTime(0.4,audioCtx.currentTime+s);
+        g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+e);
         o.start(audioCtx.currentTime+s); o.stop(audioCtx.currentTime+e);
     });
 }
-function playSound(){
-    if(!userInteracted){sessionStorage.setItem('pendingSound','1');return;}
-    if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return;}}
-    if(audioCtx.state==='suspended') audioCtx.resume().then(_playBeep);
-    else _playBeep();
+function playSound() {
+    if(!userInteracted || !audioCtx) return;
+    if(audioCtx.state==='suspended') audioCtx.resume().then(_beep); else _beep();
 }
-function sendNotif(title,body){
-    if(!notifGranted) return;
-    try{ new Notification(title,{body,tag:'order',renotify:true,requireInteraction:true}); }catch(e){}
-}
-function testSound(){
-    userInteracted=true;
-    if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return;}}
-    if(audioCtx.state==='suspended') audioCtx.resume().then(_playBeep); else _playBeep();
-}
+function testSound() { userInteracted=true; if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();} playSound(); }
 
-let lastId=parseInt(sessionStorage.getItem('lastOrderId')||'0');
-const pageMax=<?= !empty($orders)?$orders[0]['id']:0 ?>;
-if(pageMax>lastId){ lastId=pageMax; sessionStorage.setItem('lastOrderId',lastId); }
-let isReloading=false;
-
-setInterval(()=>{
+// Polling
+let lastId = <?= !empty($orders) ? max(array_column($orders,'id')) : 0 ?>;
+let isReloading = false;
+setInterval(() => {
     if(isReloading) return;
     fetch(`api/new_orders.php?last_id=${lastId}`)
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.new_orders&&data.new_orders.length>0){
-            const newest=Math.max(...data.new_orders.map(o=>parseInt(o.id)));
-            if(newest<=lastId) return;
-            lastId=newest; sessionStorage.setItem('lastOrderId',lastId);
-            sendNotif('🛎️ طلب جديد!',`طاولة ${data.new_orders[0].table_number??''}`);
-            playSound();
-            isReloading=true;
-            setTimeout(()=>location.reload(),800);
-        }
-        const badge=document.querySelector('.sb-badge');
-        if(badge&&data.pending_count!==undefined){
-            badge.textContent=data.pending_count;
-            badge.style.display=data.pending_count>0?'inline-flex':'none';
+    .then(r => r.json())
+    .then(data => {
+        if(data.new_orders && data.new_orders.length > 0) {
+            const newest = Math.max(...data.new_orders.map(o => parseInt(o.id)));
+            if(newest > lastId) {
+                lastId = newest;
+                playSound();
+                isReloading = true;
+                setTimeout(() => location.reload(), 800);
+            }
         }
     })
-    .catch(()=>{});
-},8000);
+    .catch(() => {});
+}, 10000);
 </script>
-</body>
-</html>
