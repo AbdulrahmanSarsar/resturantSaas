@@ -16,9 +16,21 @@ if(!isset($_SESSION['restaurant_id'])) {
 }
 
 $rid = $_SESSION['restaurant_id'];
-require_once __DIR__ . '/branch_helper.php';
 
+// الفرع النشط من الـ session (sidebar بيحطه)
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $branch_id = intval($_GET['branch'] ?? $active_branch_id ?? 0);
+
+// إذا ما في فرع نشط، جيب أول فرع نشط للمطعم
+if(!$branch_id) {
+    $first_branch = $pdo->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
+    $first_branch->execute([$rid]);
+    $fb = $first_branch->fetchColumn();
+    if($fb) {
+        $branch_id = intval($fb);
+        $_SESSION['active_branch_id'] = $branch_id;
+    }
+}
 
 if(!$branch_id) {
     header('Location: branches.php'); exit;

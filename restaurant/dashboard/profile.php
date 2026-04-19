@@ -96,21 +96,57 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
 
 
 // ===== إدارة الموظفين =====
+// جلب الفروع النشطة (مشترك بين الـ form والـ modal)
+$active_branches = [];
+if(plan_has_feature('staff')) {
+    $bstmt = $pdo->prepare("SELECT id, name FROM branches WHERE restaurant_id=? AND is_active=1 ORDER BY name");
+    $bstmt->execute([$rid]);
+    $active_branches = $bstmt->fetchAll();
+}
+
 if(plan_has_feature('staff') && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['staff_action'])) {
+    // تحقق إن الفرع تابع فعلاً لهذا المطعم (منع tampering)
+    $validate_branch = function($branch_id) use ($pdo, $rid) {
+        if (!$branch_id) return null;
+        $chk = $pdo->prepare("SELECT id FROM branches WHERE id=? AND restaurant_id=?");
+        $chk->execute([$branch_id, $rid]);
+        return $chk->fetch() ? (int)$branch_id : null;
+    };
+
     if($_POST['staff_action'] === 'add_staff') {
-        $sname    = trim($_POST['staff_name']);
-        $susername= trim($_POST['staff_username']);
-        $srole    = $_POST['staff_role'];
-        $spass    = $_POST['staff_password'];
-        if($sname && $susername && $spass && in_array($srole,['waiter','kitchen','cashier'])) {
+        $sname     = trim($_POST['staff_name']);
+        $susername = trim($_POST['staff_username']);
+        $srole     = $_POST['staff_role'];
+        $spass     = $_POST['staff_password'];
+        $sbranch   = $validate_branch(intval($_POST['staff_branch_id'] ?? 0));
+
+        if(!$sbranch) {
+            $error = 'الرجاء اختيار الفرع';
+        } elseif($sname && $susername && $spass && in_array($srole,['waiter','kitchen','cashier'])) {
             $hashed = password_hash($spass, PASSWORD_DEFAULT);
             try {
-                $pdo->prepare("INSERT INTO restaurant_staff (restaurant_id,name,username,password,role) VALUES (?,?,?,?,?)")
-                    ->execute([$rid,$sname,$susername,$hashed,$srole]);
+                $pdo->prepare("INSERT INTO restaurant_staff (restaurant_id,branch_id,name,username,password,role) VALUES (?,?,?,?,?,?)")
+                    ->execute([$rid,$sbranch,$sname,$susername,$hashed,$srole]);
                 $success = 'تم إضافة الموظف بنجاح!';
             } catch(Exception $e) {
                 $error = 'اسم المستخدم موجود مسبقاً';
             }
+        }
+    }
+    if($_POST['staff_action'] === 'edit_staff') {
+        $sid     = intval($_POST['staff_id']);
+        $sname   = trim($_POST['staff_name'] ?? '');
+        $srole   = $_POST['staff_role'] ?? '';
+        $sbranch = $validate_branch(intval($_POST['staff_branch_id'] ?? 0));
+
+        if(!$sbranch) {
+            $error = 'الرجاء اختيار الفرع';
+        } elseif($sname && in_array($srole,['waiter','kitchen','cashier'])) {
+            $pdo->prepare("UPDATE restaurant_staff SET name=?, role=?, branch_id=? WHERE id=? AND restaurant_id=?")
+                ->execute([$sname, $srole, $sbranch, $sid, $rid]);
+            $success = 'تم تعديل بيانات الموظف!';
+        } else {
+            $error = 'البيانات ناقصة أو غير صحيحة';
         }
     }
     if($_POST['staff_action'] === 'toggle_staff') {
@@ -126,7 +162,13 @@ if(plan_has_feature('staff') && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($
     header("Location: profile.php" . ($msg ? "?msg=$msg" : ""));
     exit;
 }
-$staff_list = $pdo->prepare("SELECT * FROM restaurant_staff WHERE restaurant_id=? ORDER BY role,name");
+$staff_list = $pdo->prepare("
+    SELECT s.*, b.name AS branch_name
+    FROM restaurant_staff s
+    LEFT JOIN branches b ON b.id = s.branch_id
+    WHERE s.restaurant_id = ?
+    ORDER BY s.role, s.name
+");
 $staff_list->execute([$rid]);
 $staff_list = $staff_list->fetchAll();
 
@@ -649,24 +691,37 @@ input[type=color] {
             <div style="width:38px;height:38px;border-radius:10px;background:<?= $role_colors[$st['role']] ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">
                 <?= $st['role']==='waiter'?'🧑‍💼':($st['role']==='cashier'?'🧾':'👨‍🍳') ?>
             </div>
-            <div style="flex:1;">
+            <div style="flex:1;min-width:0;">
                 <div style="font-size:14px;font-weight:700;color:var(--ink);"><?= htmlspecialchars($st['name']) ?></div>
-                <div style="font-size:11px;color:var(--ink2);margin-top:2px;">
+                <div style="font-size:11px;color:var(--ink2);margin-top:2px;line-height:1.7;">
                     <?php if(!empty($st['staff_number'])): ?>
                     <span style="background:var(--bg3);border:1px solid var(--line);padding:1px 7px;border-radius:8px;font-weight:800;color:var(--ink2);margin-left:4px;">#<?= $st['staff_number'] ?></span>
                     <?php endif; ?>
                     @<?= htmlspecialchars($st['username']) ?> · <span style="color:<?= $role_text[$st['role']] ?>;font-weight:700;"><?= $role_labels[$st['role']] ?></span>
+                    · <?php if($st['branch_name']): ?>
+                        <span style="color:var(--p);font-weight:700;">📍 <?= htmlspecialchars($st['branch_name']) ?></span>
+                    <?php else: ?>
+                        <span style="color:#EF4444;font-weight:700;">⚠️ فرع غير محدد</span>
+                    <?php endif; ?>
                 </div>
             </div>
-            <div style="display:flex;gap:6px;">
-                <form method="POST">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" onclick="openStaffEditModal(this)"
+                        data-id="<?= $st['id'] ?>"
+                        data-name="<?= htmlspecialchars($st['name'], ENT_QUOTES) ?>"
+                        data-role="<?= $st['role'] ?>"
+                        data-branch="<?= $st['branch_id'] ?? '' ?>"
+                        style="padding:6px 12px;border-radius:8px;border:1px solid rgba(59,130,246,0.25);font-size:11px;font-weight:700;cursor:pointer;background:rgba(59,130,246,0.08);color:#3B82F6;font-family:'Tajawal',sans-serif;">
+                    تعديل
+                </button>
+                <form method="POST" style="display:inline;">
                     <input type="hidden" name="staff_action" value="toggle_staff">
                     <input type="hidden" name="staff_id" value="<?= $st['id'] ?>">
                     <button type="submit" style="padding:6px 12px;border-radius:8px;border:1px solid var(--line);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;background:<?= $st['is_active']?'rgba(34,197,94,0.1)':'var(--bg3)' ?>;color:<?= $st['is_active']?'#22C55E':'var(--ink2)' ?>;">
                         <?= $st['is_active']?'نشط':'موقوف' ?>
                     </button>
                 </form>
-                <form method="POST" onsubmit="return confirm('حذف الموظف؟')">
+                <form method="POST" onsubmit="return confirm('حذف الموظف؟')" style="display:inline;">
                     <input type="hidden" name="staff_action" value="delete_staff">
                     <input type="hidden" name="staff_id" value="<?= $st['id'] ?>">
                     <button type="submit" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(239,68,68,0.2);font-size:11px;font-weight:700;cursor:pointer;background:rgba(239,68,68,0.08);color:#EF4444;font-family:'Tajawal',sans-serif;">حذف</button>
@@ -686,6 +741,12 @@ input[type=color] {
             <span class="fc-title">إضافة موظف جديد</span>
         </div>
         <div class="fc-body">
+            <?php if(empty($active_branches)): ?>
+            <div class="alert alert-error" style="margin-bottom:0;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                لا يوجد فروع نشطة. الرجاء <a href="branches.php" style="color:#EF4444;font-weight:800;text-decoration:underline;">إضافة فرع</a> أولاً قبل إضافة الموظفين.
+            </div>
+            <?php else: ?>
             <form method="POST">
                 <input type="hidden" name="staff_action" value="add_staff">
                 <div class="staff-form-grid" style="margin-bottom:0;">
@@ -706,6 +767,15 @@ input[type=color] {
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>الفرع *</label>
+                        <select name="staff_branch_id" required style="width:100%;padding:11px 14px;background:var(--bg3);border:1.5px solid var(--line);border-radius:12px;color:var(--ink);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;">
+                            <option value="">-- اختر الفرع --</option>
+                            <?php foreach($active_branches as $b): ?>
+                            <option value="<?= $b['id'] ?>">📍 <?= htmlspecialchars($b['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1;">
                         <label>كلمة السر *</label>
                         <input type="password" name="staff_password" placeholder="كلمة سر قوية" required>
                     </div>
@@ -715,9 +785,118 @@ input[type=color] {
                     إضافة الموظف
                 </button>
             </form>
+            <?php endif; ?>
         </div>
     </div>
 </div>
+
+<!-- ===== Modal تعديل الموظف ===== -->
+<div id="staffEditModal" class="staff-modal-overlay" onclick="if(event.target===this)closeStaffEditModal()">
+    <div class="staff-modal">
+        <div class="staff-modal-head">
+            <span>تعديل بيانات الموظف</span>
+            <button type="button" onclick="closeStaffEditModal()" class="staff-modal-close" aria-label="إغلاق">×</button>
+        </div>
+        <form method="POST" class="staff-modal-body">
+            <input type="hidden" name="staff_action" value="edit_staff">
+            <input type="hidden" name="staff_id" id="edit_staff_id">
+
+            <div class="form-group" style="margin-bottom:0;">
+                <label>الاسم *</label>
+                <input type="text" name="staff_name" id="edit_staff_name" required>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>الدور *</label>
+                <select name="staff_role" id="edit_staff_role" required style="width:100%;padding:11px 14px;background:var(--bg3);border:1.5px solid var(--line);border-radius:12px;color:var(--ink);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;">
+                    <option value="waiter">🧑‍💼 نادل</option>
+                    <option value="kitchen">👨‍🍳 مطبخ</option>
+                    <option value="cashier">🧾 كاشير</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>الفرع *</label>
+                <select name="staff_branch_id" id="edit_staff_branch" required style="width:100%;padding:11px 14px;background:var(--bg3);border:1.5px solid var(--line);border-radius:12px;color:var(--ink);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;">
+                    <option value="">-- اختر الفرع --</option>
+                    <?php foreach($active_branches as $b): ?>
+                    <option value="<?= $b['id'] ?>">📍 <?= htmlspecialchars($b['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <button type="button" onclick="closeStaffEditModal()" style="flex:1;padding:12px;background:var(--bg3);border:1px solid var(--line);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--ink2);font-size:13px;">إلغاء</button>
+                <button type="submit" style="flex:2;padding:12px;background:var(--p);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:13px;box-shadow:0 4px 14px color-mix(in srgb,var(--p) 35%,transparent);">حفظ التعديلات</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.staff-modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+    padding: 16px;
+    animation: fadeInOverlay 0.15s ease;
+}
+.staff-modal-overlay.open { display: flex; }
+.staff-modal {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    width: 100%; max-width: 440px;
+    overflow: hidden;
+    animation: slideUpModal 0.2s cubic-bezier(0.22,1,0.36,1);
+}
+.staff-modal-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'Fraunces', serif;
+    font-size: 15px; font-weight: 700; color: var(--ink);
+}
+.staff-modal-close {
+    background: transparent; border: none;
+    font-size: 22px; cursor: pointer; color: var(--ink2);
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s;
+    line-height: 1;
+}
+.staff-modal-close:hover { background: var(--bg3); color: var(--ink); }
+.staff-modal-body {
+    padding: 18px;
+    display: flex; flex-direction: column; gap: 14px;
+}
+@keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUpModal {
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+</style>
+
+<script>
+function openStaffEditModal(btn) {
+    document.getElementById('edit_staff_id').value     = btn.dataset.id;
+    document.getElementById('edit_staff_name').value   = btn.dataset.name;
+    document.getElementById('edit_staff_role').value   = btn.dataset.role;
+    document.getElementById('edit_staff_branch').value = btn.dataset.branch || '';
+    document.getElementById('staffEditModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeStaffEditModal() {
+    document.getElementById('staffEditModal').classList.remove('open');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('staffEditModal').classList.contains('open')) {
+        closeStaffEditModal();
+    }
+});
+</script>
 
 <?php endif; ?>
 

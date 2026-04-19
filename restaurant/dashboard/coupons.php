@@ -8,7 +8,37 @@ if(!isset($_SESSION['restaurant_id'])) {
 plan_required('premium');
 
 $rid = $_SESSION['restaurant_id'];
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $success = ''; $error = '';
+
+// تحقق إن branch_id column موجود (graceful fallback في حال ما تم الـ migration بعد)
+$has_branch_col = false;
+try {
+    $col_check = $pdo->query("SHOW COLUMNS FROM coupons LIKE 'branch_id'");
+    $has_branch_col = $col_check && $col_check->rowCount() > 0;
+} catch(Exception $e) {}
+
+// جلب الفروع النشطة
+$active_branches = [];
+$bstmt = $pdo->prepare("SELECT id, name FROM branches WHERE restaurant_id=? AND is_active=1 ORDER BY name");
+$bstmt->execute([$rid]);
+$active_branches = $bstmt->fetchAll();
+
+// اسم الفرع النشط
+$active_branch_name = null;
+if ($active_branch_id) {
+    foreach ($active_branches as $b) {
+        if ($b['id'] == $active_branch_id) { $active_branch_name = $b['name']; break; }
+    }
+}
+
+// تحقق إن الفرع تابع للمطعم (منع tampering)
+$validate_branch = function($branch_id) use ($pdo, $rid) {
+    if (!$branch_id) return null;
+    $chk = $pdo->prepare("SELECT id FROM branches WHERE id=? AND restaurant_id=?");
+    $chk->execute([$branch_id, $rid]);
+    return $chk->fetch() ? (int)$branch_id : null;
+};
 
 // Add coupon
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -20,6 +50,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $min_order      = floatval($_POST['min_order'] ?? 0);
         $max_uses       = intval($_POST['max_uses'] ?? 0);
         $expires_at     = !empty($_POST['expires_at']) ? $_POST['expires_at'] : null;
+        $coup_branch    = $has_branch_col ? $validate_branch(intval($_POST['branch_id'] ?? 0)) : null;
 
         if(!$code || !$discount_value) {
             $error = 'الرجاء إدخال الكود والخصم';
@@ -29,10 +60,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if($check->fetch()) {
                 $error = 'هذا الكود موجود مسبقاً';
             } else {
-                $pdo->prepare("INSERT INTO coupons
-                    (restaurant_id, code, discount_type, discount_value, min_order, max_uses, expires_at, is_active)
-                    VALUES (?,?,?,?,?,?,?,1)")
-                    ->execute([$rid, $code, $discount_type, $discount_value, $min_order, $max_uses ?: null, $expires_at]);
+                if ($has_branch_col) {
+                    $pdo->prepare("INSERT INTO coupons
+                        (restaurant_id, branch_id, code, discount_type, discount_value, min_order, max_uses, expires_at, is_active)
+                        VALUES (?,?,?,?,?,?,?,?,1)")
+                        ->execute([$rid, $coup_branch, $code, $discount_type, $discount_value, $min_order, $max_uses ?: null, $expires_at]);
+                } else {
+                    $pdo->prepare("INSERT INTO coupons
+                        (restaurant_id, code, discount_type, discount_value, min_order, max_uses, expires_at, is_active)
+                        VALUES (?,?,?,?,?,?,?,1)")
+                        ->execute([$rid, $code, $discount_type, $discount_value, $min_order, $max_uses ?: null, $expires_at]);
+                }
                 $success = 'تم إضافة الكوبون بنجاح';
             }
         }
@@ -50,8 +88,31 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$coupons = $pdo->prepare("SELECT * FROM coupons WHERE restaurant_id=? ORDER BY created_at DESC");
-$coupons->execute([$rid]);
+// فلترة القائمة حسب الفرع النشط:
+//  - active_branch_id = NULL → كل كوبونات المطعم
+//  - active_branch_id محدد → كوبونات الفرع + الكوبونات العامة (branch_id IS NULL)
+if ($has_branch_col && $active_branch_id) {
+    $coupons = $pdo->prepare("
+        SELECT c.*, b.name AS branch_name
+        FROM coupons c
+        LEFT JOIN branches b ON b.id = c.branch_id
+        WHERE c.restaurant_id = ? AND (c.branch_id IS NULL OR c.branch_id = ?)
+        ORDER BY c.created_at DESC
+    ");
+    $coupons->execute([$rid, $active_branch_id]);
+} elseif ($has_branch_col) {
+    $coupons = $pdo->prepare("
+        SELECT c.*, b.name AS branch_name
+        FROM coupons c
+        LEFT JOIN branches b ON b.id = c.branch_id
+        WHERE c.restaurant_id = ?
+        ORDER BY c.created_at DESC
+    ");
+    $coupons->execute([$rid]);
+} else {
+    $coupons = $pdo->prepare("SELECT * FROM coupons WHERE restaurant_id=? ORDER BY created_at DESC");
+    $coupons->execute([$rid]);
+}
 $coupons = $coupons->fetchAll();
 
 // Stats
@@ -307,9 +368,30 @@ require_once 'sidebar.php';
 <div class="main">
 
     <div style="margin-bottom:20px;">
-        <div class="page-title">الكوبونات</div>
-        <div class="page-subtitle">أكواد خصم لزبائنك</div>
+        <div class="page-title">
+            الكوبونات
+            <?php if($active_branch_name): ?>
+            <span style="display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--p) 12%,transparent);color:var(--p);padding:4px 11px;border-radius:20px;font-size:12px;font-weight:800;margin-right:8px;vertical-align:middle;">
+                📍 <?= htmlspecialchars($active_branch_name) ?>
+            </span>
+            <?php endif; ?>
+        </div>
+        <div class="page-subtitle">
+            <?= $active_branch_name
+                ? 'كوبونات فرع ' . htmlspecialchars($active_branch_name) . ' + الكوبونات العامة'
+                : 'أكواد خصم لزبائنك' ?>
+        </div>
     </div>
+
+    <?php if(!$has_branch_col): ?>
+    <div class="alert alert-error" style="margin-bottom:16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div>
+            <strong>Migration مطلوب:</strong> لتفعيل الكوبونات per branch، نفّذ:
+            <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;">ALTER TABLE coupons ADD COLUMN branch_id INT DEFAULT NULL AFTER restaurant_id;</code>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php if($success): ?>
         <div class="alert alert-success">
@@ -404,6 +486,22 @@ require_once 'sidebar.php';
                         <label>تاريخ الانتهاء</label>
                         <input type="date" name="expires_at">
                     </div>
+                    <?php if($has_branch_col): ?>
+                    <div class="form-group full">
+                        <label>الفرع (اختياري)</label>
+                        <select name="branch_id" class="filter-select" style="width:100%">
+                            <option value="">🌐 كل الفروع (كوبون عام)</option>
+                            <?php foreach($active_branches as $b): ?>
+                            <option value="<?= $b['id'] ?>" <?= ($active_branch_id == $b['id']) ? 'selected' : '' ?>>
+                                📍 <?= htmlspecialchars($b['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small style="display:block;margin-top:5px;font-size:11px;color:var(--ink2);">
+                            اتركه على "كل الفروع" ليعمل الكوبون في أي فرع
+                        </small>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <button type="submit" class="btn btn-primary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -455,6 +553,17 @@ require_once 'sidebar.php';
 
                 <!-- Detail chips -->
                 <div class="coup-details">
+                    <?php if($has_branch_col): ?>
+                        <?php if(!empty($c['branch_name'])): ?>
+                        <span class="coup-chip" style="color:var(--p);border-color:color-mix(in srgb,var(--p) 30%,transparent);background:color-mix(in srgb,var(--p) 8%,transparent);">
+                            📍 <?= htmlspecialchars($c['branch_name']) ?>
+                        </span>
+                        <?php else: ?>
+                        <span class="coup-chip" style="color:#22C55E;border-color:rgba(34,197,94,0.25);background:rgba(34,197,94,0.08);">
+                            🌐 كل الفروع
+                        </span>
+                        <?php endif; ?>
+                    <?php endif; ?>
                     <?php if($c['min_order'] > 0): ?>
                     <span class="coup-chip">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>

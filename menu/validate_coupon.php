@@ -6,6 +6,7 @@ if($_SERVER['REQUEST_METHOD'] !== 'POST') { exit; }
 
 $code          = strtoupper(trim($_POST['code'] ?? ''));
 $restaurant_id = intval($_POST['restaurant_id'] ?? 0);
+$branch_id     = intval($_POST['branch_id'] ?? 0);
 $total         = floatval($_POST['total'] ?? 0);
 
 if(!$code || !$restaurant_id) {
@@ -13,13 +14,32 @@ if(!$code || !$restaurant_id) {
     exit;
 }
 
-$coupon = $pdo->prepare("
-    SELECT * FROM coupons
-    WHERE code=? AND restaurant_id=? AND is_active=1
-    AND (expires_at IS NULL OR expires_at >= CURDATE())
-    AND (max_uses IS NULL OR used_count < max_uses)
-");
-$coupon->execute([$code, $restaurant_id]);
+// تحقق إن branch_id column موجود (graceful fallback)
+$has_branch_col = false;
+try {
+    $col_check = $pdo->query("SHOW COLUMNS FROM coupons LIKE 'branch_id'");
+    $has_branch_col = $col_check && $col_check->rowCount() > 0;
+} catch(Exception $e) {}
+
+if ($has_branch_col && $branch_id) {
+    // الكوبون صالح إذا: (عام) أو (تابع لهذا الفرع)
+    $coupon = $pdo->prepare("
+        SELECT * FROM coupons
+        WHERE code = ? AND restaurant_id = ? AND is_active = 1
+          AND (branch_id IS NULL OR branch_id = ?)
+          AND (expires_at IS NULL OR expires_at >= CURDATE())
+          AND (max_uses IS NULL OR used_count < max_uses)
+    ");
+    $coupon->execute([$code, $restaurant_id, $branch_id]);
+} else {
+    $coupon = $pdo->prepare("
+        SELECT * FROM coupons
+        WHERE code = ? AND restaurant_id = ? AND is_active = 1
+          AND (expires_at IS NULL OR expires_at >= CURDATE())
+          AND (max_uses IS NULL OR used_count < max_uses)
+    ");
+    $coupon->execute([$code, $restaurant_id]);
+}
 $coupon = $coupon->fetch();
 
 if(!$coupon) {
@@ -35,10 +55,10 @@ if($total < $coupon['min_order']) {
     exit;
 }
 
-// حساب الخصم
-if($coupon['discount_type'] === 'percentage') {
+// حساب الخصم (بيدعم 'percent' و 'percentage' للتوافق)
+if(in_array($coupon['discount_type'], ['percent','percentage'])) {
     $discount = ($total * $coupon['discount_value']) / 100;
-    $msg = 'خصم '.$coupon['discount_value'].'% = $'.number_format($discount,2);
+    $msg = 'خصم '.rtrim(rtrim(number_format($coupon['discount_value'],2),'0'),'.').'% = $'.number_format($discount,2);
 } else {
     $discount = min($coupon['discount_value'], $total);
     $msg = 'خصم $'.number_format($discount,2);

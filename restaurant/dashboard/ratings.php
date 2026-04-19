@@ -8,10 +8,24 @@ if(!isset($_SESSION['restaurant_id'])) {
 plan_required('advanced');
 
 $rid = $_SESSION['restaurant_id'];
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
+
+// Branch filter patterns (shared across queries)
+$bf_order  = $active_branch_id ? 'AND o.branch_id = ?' : '';
+$bf_staff  = $active_branch_id ? 'AND s.branch_id = ?' : '';
+$bf_params = $active_branch_id ? [$active_branch_id]    : [];
+
+// اسم الفرع النشط (للعرض في العنوان)
+$active_branch_name = null;
+if ($active_branch_id) {
+    $bstmt = $pdo->prepare("SELECT name FROM branches WHERE id=? AND restaurant_id=?");
+    $bstmt->execute([$active_branch_id, $rid]);
+    $active_branch_name = $bstmt->fetchColumn() ?: null;
+}
 
 $filter_stars = intval($_GET['stars'] ?? 0);
-$where  = 'WHERE r.restaurant_id = ?';
-$params = [$rid];
+$where  = 'WHERE r.restaurant_id = ? ' . $bf_order;
+$params = array_merge([$rid], $bf_params);
 if($filter_stars) { $where .= ' AND r.rating = ?'; $params[] = $filter_stars; }
 
 $ratings = $pdo->prepare("
@@ -19,7 +33,7 @@ $ratings = $pdo->prepare("
            d.name as fav_dish_name, d.image as fav_dish_image
     FROM order_ratings r
     JOIN orders o ON o.id = r.order_id
-    LEFT JOIN dishes d ON d.id = r.favorite_dish_id
+    LEFT JOIN dishes_v2 d ON d.id = r.favorite_dish_id
     $where
     ORDER BY r.created_at DESC
 ");
@@ -27,26 +41,29 @@ $ratings->execute($params);
 $ratings = $ratings->fetchAll();
 
 $stats = $pdo->prepare("
-    SELECT COUNT(*) as total, ROUND(AVG(rating),1) as avg_rating,
-        SUM(rating=5) as five_star, SUM(rating=4) as four_star,
-        SUM(rating=3) as three_star, SUM(rating=2) as two_star, SUM(rating=1) as one_star
-    FROM order_ratings WHERE restaurant_id=?
+    SELECT COUNT(*) as total, ROUND(AVG(r.rating),1) as avg_rating,
+        SUM(r.rating=5) as five_star, SUM(r.rating=4) as four_star,
+        SUM(r.rating=3) as three_star, SUM(r.rating=2) as two_star, SUM(r.rating=1) as one_star
+    FROM order_ratings r
+    JOIN orders o ON o.id = r.order_id
+    WHERE r.restaurant_id = ? $bf_order
 ");
-$stats->execute([$rid]);
+$stats->execute(array_merge([$rid], $bf_params));
 $stats = $stats->fetch();
 
 $fav_dishes = $pdo->prepare("
     SELECT d.name, d.image, COUNT(*) as fav_count
     FROM order_ratings r
-    JOIN dishes d ON d.id = r.favorite_dish_id
-    WHERE r.restaurant_id=? AND r.favorite_dish_id IS NOT NULL
+    JOIN orders o ON o.id = r.order_id
+    JOIN dishes_v2 d ON d.id = r.favorite_dish_id
+    WHERE r.restaurant_id = ? AND r.favorite_dish_id IS NOT NULL $bf_order
     GROUP BY r.favorite_dish_id
     ORDER BY fav_count DESC LIMIT 5
 ");
-$fav_dishes->execute([$rid]);
+$fav_dishes->execute(array_merge([$rid], $bf_params));
 $fav_dishes = $fav_dishes->fetchAll();
 
-// تقييمات النادلين
+// تقييمات النادلين (مفلترة حسب فرع النادل)
 $waiter_stats = $pdo->prepare("
     SELECT s.id, s.name,
         COUNT(r.id) as total_ratings,
@@ -55,23 +72,23 @@ $waiter_stats = $pdo->prepare("
         SUM(r.waiter_rating=3) as three_star, SUM(r.waiter_rating=2) as two_star,
         SUM(r.waiter_rating=1) as one_star
     FROM restaurant_staff s
-    LEFT JOIN order_ratings r ON r.waiter_id=s.id AND r.waiter_rating IS NOT NULL
-    WHERE s.restaurant_id=? AND s.role='waiter'
+    LEFT JOIN order_ratings r ON r.waiter_id = s.id AND r.waiter_rating IS NOT NULL
+    WHERE s.restaurant_id = ? AND s.role = 'waiter' $bf_staff
     GROUP BY s.id ORDER BY avg_rating DESC
 ");
-$waiter_stats->execute([$rid]);
+$waiter_stats->execute(array_merge([$rid], $bf_params));
 $waiter_stats = $waiter_stats->fetchAll();
 
 $waiter_comments = $pdo->prepare("
     SELECT r.waiter_rating, r.comment, r.created_at,
            o.table_number, o.customer_name, s.name as waiter_name
     FROM order_ratings r
-    JOIN orders o ON o.id=r.order_id
-    JOIN restaurant_staff s ON s.id=r.waiter_id
-    WHERE r.restaurant_id=? AND r.waiter_rating IS NOT NULL AND r.comment IS NOT NULL AND r.comment != ''
+    JOIN orders o ON o.id = r.order_id
+    JOIN restaurant_staff s ON s.id = r.waiter_id
+    WHERE r.restaurant_id = ? AND r.waiter_rating IS NOT NULL AND r.comment IS NOT NULL AND r.comment != '' $bf_order
     ORDER BY r.created_at DESC LIMIT 5
 ");
-$waiter_comments->execute([$rid]);
+$waiter_comments->execute(array_merge([$rid], $bf_params));
 $waiter_comments = $waiter_comments->fetchAll();
 
 require_once 'sidebar.php';
@@ -161,14 +178,29 @@ require_once 'sidebar.php';
 
 <div class="main">
     <div style="margin-bottom:20px;">
-        <div class="page-title">التقييمات</div>
-        <div class="page-subtitle">آراء زبائنك عن تجربتهم</div>
+        <div class="page-title">
+            التقييمات
+            <?php if($active_branch_name): ?>
+            <span style="display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--p) 12%,transparent);color:var(--p);padding:4px 11px;border-radius:20px;font-size:12px;font-weight:800;margin-right:8px;vertical-align:middle;">
+                📍 <?= htmlspecialchars($active_branch_name) ?>
+            </span>
+            <?php endif; ?>
+        </div>
+        <div class="page-subtitle">
+            <?= $active_branch_name ? 'تقييمات فرع ' . htmlspecialchars($active_branch_name) : 'آراء زبائنك عن تجربتهم' ?>
+        </div>
     </div>
 
     <?php if($stats['total'] == 0): ?>
     <div class="ratings-empty">
         <div class="ratings-empty-icon">⭐</div>
-        <p>ما في تقييمات بعد — شجع زبائنك على التقييم!</p>
+        <p>
+            <?php if($active_branch_name): ?>
+                ما في تقييمات لفرع <?= htmlspecialchars($active_branch_name) ?> بعد
+            <?php else: ?>
+                ما في تقييمات بعد — شجع زبائنك على التقييم!
+            <?php endif; ?>
+        </p>
     </div>
     <?php else: ?>
 
