@@ -57,9 +57,19 @@ $primary  = '#FF6B35';
 $qr_table = isset($_GET['table']) ? trim($_GET['table']) : '';
 
 // ===== الضرائب =====
-$taxes_stmt = $pdo->prepare("SELECT * FROM restaurant_taxes WHERE restaurant_id=? AND is_active=1 ORDER BY sort_order");
-$taxes_stmt->execute([$rid]);
-$active_taxes = $taxes_stmt->fetchAll();
+// branch_taxes أولاً (per-branch)، fallback لـ restaurant_taxes
+// (نفس منطق OrderService — لازم العرض يطابق الحساب)
+$active_taxes = [];
+if(!empty($branch['id'])) {
+    $taxes_stmt = $pdo->prepare("SELECT * FROM branch_taxes WHERE branch_id=? AND is_active=1 ORDER BY sort_order");
+    $taxes_stmt->execute([$branch['id']]);
+    $active_taxes = $taxes_stmt->fetchAll();
+}
+if(empty($active_taxes)) {
+    $taxes_stmt = $pdo->prepare("SELECT * FROM restaurant_taxes WHERE restaurant_id=? AND is_active=1 ORDER BY sort_order");
+    $taxes_stmt->execute([$rid]);
+    $active_taxes = $taxes_stmt->fetchAll();
+}
 
 // ===== POST: تسجيل الطلب =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['items'])) {

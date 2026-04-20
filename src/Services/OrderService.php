@@ -162,14 +162,27 @@ class OrderService
         $discountAmount = floatval($data['discount_amount'] ?? 0);
         $afterDiscount  = max(0, $subtotal - $discountAmount);
 
-        // Calculate taxes
-        $taxes = $this->db->prepare("
-            SELECT * FROM branch_taxes 
-            WHERE branch_id = ? AND is_active = 1 
-            ORDER BY sort_order
-        ");
-        $taxes->execute([$branchId]);
-        $activeTaxes = $taxes->fetchAll();
+        // Calculate taxes — branch_taxes أولاً، fallback لـ restaurant_taxes
+        // (للتوافق مع المطاعم اللي ما رحّلت ضرائبها لكل فرع بعد)
+        $activeTaxes = [];
+        if ($branchId) {
+            $taxes = $this->db->prepare("
+                SELECT * FROM branch_taxes
+                WHERE branch_id = ? AND is_active = 1
+                ORDER BY sort_order
+            ");
+            $taxes->execute([$branchId]);
+            $activeTaxes = $taxes->fetchAll();
+        }
+        if (empty($activeTaxes)) {
+            $taxes = $this->db->prepare("
+                SELECT * FROM restaurant_taxes
+                WHERE restaurant_id = ? AND is_active = 1
+                ORDER BY sort_order
+            ");
+            $taxes->execute([$restaurantId]);
+            $activeTaxes = $taxes->fetchAll();
+        }
 
         $taxAmount  = 0;
         $taxDetails = [];

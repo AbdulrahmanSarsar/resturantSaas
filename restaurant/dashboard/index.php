@@ -8,35 +8,48 @@ if(!isset($_SESSION['restaurant_id'])) {
 
 $rid = $_SESSION['restaurant_id'];
 
+// ===== Branch filter (active_branch_id من الـ session) =====
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
+$bf  = $active_branch_id ? 'AND branch_id = ?'    : '';
+$bfo = $active_branch_id ? 'AND o.branch_id = ?'  : '';
+$bp  = $active_branch_id ? [$active_branch_id]    : [];
+
 // ===== Stats =====
-$total_dishes = $pdo->prepare("SELECT COUNT(*) FROM dishes WHERE restaurant_id = ?");
+// dishes/categories على مستوى المطعم (مش الفرع — حسب ADR-003)
+$total_dishes = $pdo->prepare("SELECT COUNT(*) FROM dishes_v2 WHERE restaurant_id = ?");
 $total_dishes->execute([$rid]); $total_dishes = $total_dishes->fetchColumn();
 
-$total_cats = $pdo->prepare("SELECT COUNT(*) FROM categories WHERE restaurant_id = ?");
+$total_cats = $pdo->prepare("SELECT COUNT(*) FROM categories_v2 WHERE restaurant_id = ?");
 $total_cats->execute([$rid]); $total_cats = $total_cats->fetchColumn();
 
-$today_orders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND DATE(created_at) = CURDATE()");
-$today_orders->execute([$rid]); $today_orders = $today_orders->fetchColumn();
+$today_orders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? $bf AND DATE(created_at) = CURDATE()");
+$today_orders->execute(array_merge([$rid], $bp)); $today_orders = $today_orders->fetchColumn();
 
-$today_revenue = $pdo->prepare("SELECT COALESCE(SUM(total_price),0) FROM orders WHERE restaurant_id = ? AND DATE(created_at) = CURDATE() AND status != 'cancelled'");
-$today_revenue->execute([$rid]); $today_revenue = $today_revenue->fetchColumn();
+$today_revenue = $pdo->prepare("SELECT COALESCE(SUM(total_price),0) FROM orders WHERE restaurant_id = ? $bf AND DATE(created_at) = CURDATE() AND status != 'cancelled'");
+$today_revenue->execute(array_merge([$rid], $bp)); $today_revenue = $today_revenue->fetchColumn();
 
-$pending_orders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND status = 'pending'");
-$pending_orders->execute([$rid]); $pending_orders = $pending_orders->fetchColumn();
+$pending_orders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? $bf AND status = 'pending'");
+$pending_orders->execute(array_merge([$rid], $bp)); $pending_orders = $pending_orders->fetchColumn();
 
-$avg_rating = $pdo->prepare("SELECT ROUND(AVG(rating),1) FROM order_ratings WHERE restaurant_id = ?");
-$avg_rating->execute([$rid]); $avg_rating = $avg_rating->fetchColumn() ?? '—';
+// التقييمات: JOIN على orders للفلترة بالفرع
+$avg_rating = $pdo->prepare("
+    SELECT ROUND(AVG(r.rating),1)
+    FROM order_ratings r
+    JOIN orders o ON o.id = r.order_id
+    WHERE r.restaurant_id = ? $bfo
+");
+$avg_rating->execute(array_merge([$rid], $bp)); $avg_rating = $avg_rating->fetchColumn() ?? '—';
 
 // ===== Last 7 days revenue (for sparkline) =====
 $sparkline = $pdo->prepare("
     SELECT DATE(created_at) as d, COALESCE(SUM(total_price),0) as rev
     FROM orders
-    WHERE restaurant_id = ? AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+    WHERE restaurant_id = ? $bf AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
       AND status != 'cancelled'
     GROUP BY DATE(created_at)
     ORDER BY d ASC
 ");
-$sparkline->execute([$rid]);
+$sparkline->execute(array_merge([$rid], $bp));
 $spark_raw = $sparkline->fetchAll(PDO::FETCH_KEY_PAIR);
 $spark_data = [];
 for($i = 6; $i >= 0; $i--) {
@@ -45,24 +58,24 @@ for($i = 6; $i >= 0; $i--) {
 }
 
 // ===== Yesterday comparison =====
-$yesterday_rev = $pdo->prepare("SELECT COALESCE(SUM(total_price),0) FROM orders WHERE restaurant_id = ? AND DATE(created_at) = DATE_SUB(CURDATE(),INTERVAL 1 DAY) AND status != 'cancelled'");
-$yesterday_rev->execute([$rid]); $yesterday_rev = $yesterday_rev->fetchColumn();
+$yesterday_rev = $pdo->prepare("SELECT COALESCE(SUM(total_price),0) FROM orders WHERE restaurant_id = ? $bf AND DATE(created_at) = DATE_SUB(CURDATE(),INTERVAL 1 DAY) AND status != 'cancelled'");
+$yesterday_rev->execute(array_merge([$rid], $bp)); $yesterday_rev = $yesterday_rev->fetchColumn();
 $rev_change = $yesterday_rev > 0 ? round((($today_revenue - $yesterday_rev) / $yesterday_rev) * 100, 1) : 0;
 
 // ===== Last orders =====
-$last_orders = $pdo->prepare("SELECT * FROM orders WHERE restaurant_id = ? ORDER BY created_at DESC LIMIT 8");
-$last_orders->execute([$rid]); $last_orders = $last_orders->fetchAll();
+$last_orders = $pdo->prepare("SELECT * FROM orders WHERE restaurant_id = ? $bf ORDER BY created_at DESC LIMIT 8");
+$last_orders->execute(array_merge([$rid], $bp)); $last_orders = $last_orders->fetchAll();
 
 // ===== Top dish today =====
 $top_dish = $pdo->prepare("
     SELECT d.name, SUM(oi.quantity) as qty
     FROM order_items oi
-    JOIN dishes d ON d.id = oi.dish_id
+    JOIN dishes_v2 d ON d.id = oi.dish_id
     JOIN orders o ON o.id = oi.order_id
-    WHERE o.restaurant_id = ? AND DATE(o.created_at) = CURDATE()
+    WHERE o.restaurant_id = ? $bfo AND DATE(o.created_at) = CURDATE()
     GROUP BY oi.dish_id ORDER BY qty DESC LIMIT 1
 ");
-$top_dish->execute([$rid]); $top_dish = $top_dish->fetch();
+$top_dish->execute(array_merge([$rid], $bp)); $top_dish = $top_dish->fetch();
 
 require_once 'sidebar.php';
 

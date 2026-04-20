@@ -36,16 +36,16 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if(!$name) { $error = 'اسم العرض مطلوب.'; }
         else {
             if($_POST['action'] === 'add') {
-                $pdo->prepare("INSERT INTO offers (restaurant_id,name,name_en,description,description_en,type,combo_price,image,is_active,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)")
+                $pdo->prepare("INSERT INTO offers_v2 (restaurant_id,name,name_en,description,description_en,type,combo_price,image,is_active,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)")
                     ->execute([$rid,$name,$name_en,$desc,$desc_en,$type,$combo_price,$image,$is_active,$sort]);
                 $offer_id = $pdo->lastInsertId();
                 $success = 'تمت إضافة العرض!';
             } else {
                 $offer_id = intval($_POST['offer_id']);
-                $pdo->prepare("UPDATE offers SET name=?,name_en=?,description=?,description_en=?,type=?,combo_price=?,image=?,is_active=?,sort_order=? WHERE id=? AND restaurant_id=?")
+                $pdo->prepare("UPDATE offers_v2 SET name=?,name_en=?,description=?,description_en=?,type=?,combo_price=?,image=?,is_active=?,sort_order=? WHERE id=? AND restaurant_id=?")
                     ->execute([$name,$name_en,$desc,$desc_en,$type,$combo_price,$image,$is_active,$sort,$offer_id,$rid]);
                 // احذف items القديمة
-                $pdo->prepare("DELETE FROM offer_items WHERE offer_id=?")->execute([$offer_id]);
+                $pdo->prepare("DELETE FROM offer_items_v2 WHERE offer_id=?")->execute([$offer_id]);
                 $success = 'تم تعديل العرض!';
             }
 
@@ -56,7 +56,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $qty      = intval($itm['quantity'] ?? 1);
                 $role     = in_array($itm['role']??'',['buy','get','combo']) ? $itm['role'] : 'combo';
                 if($dish_id) {
-                    $pdo->prepare("INSERT INTO offer_items (offer_id,dish_id,quantity,role) VALUES (?,?,?,?)")
+                    $pdo->prepare("INSERT INTO offer_items_v2 (offer_id,dish_id,quantity,role) VALUES (?,?,?,?)")
                         ->execute([$offer_id,$dish_id,$qty,$role]);
                 }
             }
@@ -65,13 +65,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if($_POST['action'] === 'delete') {
         $oid = intval($_POST['offer_id']);
-        $pdo->prepare("DELETE FROM offer_items WHERE offer_id=?")->execute([$oid]);
-        $pdo->prepare("DELETE FROM offers WHERE id=? AND restaurant_id=?")->execute([$oid,$rid]);
+        $pdo->prepare("DELETE FROM offer_items_v2 WHERE offer_id=?")->execute([$oid]);
+        $pdo->prepare("DELETE FROM offers_v2 WHERE id=? AND restaurant_id=?")->execute([$oid,$rid]);
         $success = 'تم حذف العرض!';
     }
 
     if($_POST['action'] === 'toggle') {
-        $pdo->prepare("UPDATE offers SET is_active=NOT is_active WHERE id=? AND restaurant_id=?")
+        $pdo->prepare("UPDATE offers_v2 SET is_active=NOT is_active WHERE id=? AND restaurant_id=?")
             ->execute([intval($_POST['offer_id']),$rid]);
         $success = 'تم تحديث حالة العرض!';
     }
@@ -87,16 +87,16 @@ if(isset($_GET['msg']) && !$success && !$error) {
     else $error = $decoded;
 }
 
-// جلب البيانات
+// جلب البيانات (من _v2 — متطابق مع menu/index.php)
 $offers = $pdo->prepare("
-    SELECT o.*, 
+    SELECT o.*,
         GROUP_CONCAT(
             JSON_OBJECT('id',oi.id,'dish_id',oi.dish_id,'quantity',oi.quantity,'role',oi.role,'dish_name',d.name)
             ORDER BY oi.id
         ) as items_json
-    FROM offers o
-    LEFT JOIN offer_items oi ON oi.offer_id = o.id
-    LEFT JOIN dishes d ON d.id = oi.dish_id
+    FROM offers_v2 o
+    LEFT JOIN offer_items_v2 oi ON oi.offer_id = o.id
+    LEFT JOIN dishes_v2 d ON d.id = oi.dish_id
     WHERE o.restaurant_id=?
     GROUP BY o.id
     ORDER BY o.sort_order, o.id DESC
@@ -109,7 +109,7 @@ foreach($offers as &$o) {
 }
 unset($o);
 
-$all_dishes = $pdo->prepare("SELECT id,name,price,image FROM dishes WHERE restaurant_id=? AND is_available=1 ORDER BY name");
+$all_dishes = $pdo->prepare("SELECT id,name,price,image FROM dishes_v2 WHERE restaurant_id=? AND is_available=1 ORDER BY name");
 $all_dishes->execute([$rid]);
 $all_dishes = $all_dishes->fetchAll();
 
