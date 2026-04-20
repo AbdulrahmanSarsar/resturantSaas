@@ -45,51 +45,24 @@ if (!function_exists('fmt_price')) {
 $date_from = date('Y-m-d', strtotime("-{$period} days"));
 
 // ===== الفروع =====
+// orders.branch_id موجود بعد الترحيل — بنستخدمه مباشرة
 $branches_stmt = $pdo->prepare("
     SELECT b.*,
-        -- إحصائيات من orders_v2
-        (SELECT COUNT(*) FROM orders_v2
-            WHERE branch_id = b.id AND DATE(created_at) >= ?)          AS v2_total,
-        (SELECT COALESCE(SUM(total_price),0) FROM orders_v2
-            WHERE branch_id = b.id AND DATE(created_at) >= ?
-            AND status = 'delivered')                                   AS v2_revenue,
-        (SELECT COUNT(*) FROM orders_v2
-            WHERE branch_id = b.id AND DATE(created_at) = CURDATE())   AS v2_today,
-        (SELECT COUNT(*) FROM orders_v2
-            WHERE branch_id = b.id AND status = 'pending')             AS v2_pending,
-        -- إحصائيات من orders القديم (fallback — restaurant_id = branch_id في النظام القديم)
         (SELECT COUNT(*) FROM orders
-            WHERE restaurant_id = ? AND DATE(created_at) >= ?)         AS legacy_total,
+            WHERE branch_id = b.id AND DATE(created_at) >= ?)                  AS total_orders,
         (SELECT COALESCE(SUM(total_price),0) FROM orders
-            WHERE restaurant_id = ? AND DATE(created_at) >= ?
-            AND status = 'delivered')                                   AS legacy_revenue,
+            WHERE branch_id = b.id AND DATE(created_at) >= ?
+            AND status = 'delivered')                                          AS revenue,
         (SELECT COUNT(*) FROM orders
-            WHERE restaurant_id = ? AND DATE(created_at) = CURDATE())  AS legacy_today,
+            WHERE branch_id = b.id AND DATE(created_at) = CURDATE())           AS today_orders,
         (SELECT COUNT(*) FROM orders
-            WHERE restaurant_id = ? AND status = 'pending')            AS legacy_pending
+            WHERE branch_id = b.id AND status = 'pending')                     AS pending
     FROM branches b
     WHERE b.restaurant_id = ?
     ORDER BY b.id ASC
 ");
-$branches_stmt->execute([
-    $date_from, $date_from,         // v2_total, v2_revenue
-    $rid, $date_from,               // legacy_total
-    $rid, $date_from,               // legacy_revenue
-    $rid,                           // legacy_today
-    $rid,                           // legacy_pending
-    $rid,                           // WHERE
-]);
+$branches_stmt->execute([$date_from, $date_from, $rid]);
 $branches = $branches_stmt->fetchAll();
-
-// دمج v2 + legacy (الـ legacy بيظهر بالفرع الأول فقط لأنه ما عنده branch_id)
-foreach ($branches as &$b) {
-    // إذا ما في بيانات v2، استخدم legacy (للفرع الأول/الوحيد)
-    $b['total_orders'] = intval($b['v2_total']) ?: intval($b['legacy_total']);
-    $b['revenue']      = floatval($b['v2_revenue']) ?: floatval($b['legacy_revenue']);
-    $b['today_orders'] = intval($b['v2_today'])  ?: intval($b['legacy_today']);
-    $b['pending']      = intval($b['v2_pending']) ?: intval($b['legacy_pending']);
-}
-unset($b);
 
 // ===== إجماليات =====
 $total_revenue = array_sum(array_column($branches, 'revenue'));
@@ -98,7 +71,7 @@ $total_today   = array_sum(array_column($branches, 'today_orders'));
 $total_pending = array_sum(array_column($branches, 'pending'));
 $active_count  = count(array_filter($branches, fn($b) => $b['is_active']));
 
-// ===== أفضل الأطباق (من orders القديم + v2) =====
+// ===== أفضل الأطباق =====
 $top_dishes = $pdo->prepare("
     SELECT
         oi.dish_name,
@@ -117,31 +90,6 @@ $top_dishes = $pdo->prepare("
 ");
 $top_dishes->execute([$rid, $date_from]);
 $top_dishes = $top_dishes->fetchAll();
-
-// أضف من v2 إذا فيه بيانات
-try {
-    $top_v2 = $pdo->prepare("
-        SELECT
-            oi.dish_name,
-            SUM(oi.quantity)                  AS total_qty,
-            SUM(oi.quantity * oi.dish_price)  AS total_rev,
-            COUNT(DISTINCT oi.order_id)       AS order_count
-        FROM order_items_v2 oi
-        JOIN orders_v2 o ON o.id = oi.order_id
-        WHERE o.restaurant_id = ?
-          AND o.status = 'delivered'
-          AND DATE(o.created_at) >= ?
-          AND oi.dish_id IS NOT NULL
-        GROUP BY oi.dish_name
-        ORDER BY total_qty DESC
-        LIMIT 8
-    ");
-    $top_v2->execute([$rid, $date_from]);
-    $top_v2_data = $top_v2->fetchAll();
-    if (!empty($top_v2_data)) {
-        $top_dishes = $top_v2_data; // v2 أحدث
-    }
-} catch (Exception $e) { /* order_items_v2 ممكن فارغة */ }
 
 // ===== توزيع الطلبات بالساعة =====
 $hourly_stmt = $pdo->prepare("

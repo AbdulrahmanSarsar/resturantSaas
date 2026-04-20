@@ -31,27 +31,68 @@ class DishService
 
     /**
      * Get all dishes for a restaurant, optionally filtered by category.
+     *
+     * If $branchId is provided, merges branch_dish_overrides for:
+     *   - sold_out, discount_percent, discount_active, is_available, price
+     * This matches what the customer menu sees (via MenuService).
      */
-    public function getAllForRestaurant(int $restaurantId, ?int $categoryId = null): array
+    public function getAllForRestaurant(int $restaurantId, ?int $categoryId = null, ?int $branchId = null): array
     {
-        if ($categoryId) {
-            $stmt = $this->db->prepare("
-                SELECT d.*, c.name as cat_name 
-                FROM dishes d LEFT JOIN categories c ON c.id = d.category_id 
-                WHERE d.restaurant_id = ? AND d.category_id = ? 
-                ORDER BY d.sort_order, d.id DESC
-            ");
-            $stmt->execute([$restaurantId, $categoryId]);
-        } else {
-            $stmt = $this->db->prepare("
-                SELECT d.*, c.name as cat_name 
-                FROM dishes d LEFT JOIN categories c ON c.id = d.category_id 
-                WHERE d.restaurant_id = ? 
-                ORDER BY d.sort_order, d.id DESC
-            ");
-            $stmt->execute([$restaurantId]);
+        $params = [$restaurantId];
+        $joinBranch = '';
+        $selectBranch = '';
+
+        if ($branchId) {
+            $joinBranch = "LEFT JOIN branch_dish_overrides bdo ON bdo.dish_id = d.id AND bdo.branch_id = ?";
+            $selectBranch = ",
+                bdo.price            AS branch_price,
+                bdo.discount_percent AS branch_discount_percent,
+                bdo.discount_active  AS branch_discount_active,
+                bdo.is_available     AS branch_is_available,
+                bdo.sold_out         AS branch_sold_out";
+            array_unshift($params, $branchId);
         }
-        return $stmt->fetchAll();
+
+        $catFilter = '';
+        if ($categoryId) {
+            $catFilter = "AND d.category_id = ?";
+            $params[] = $categoryId;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT d.*, c.name as cat_name {$selectBranch}
+            FROM dishes d
+            LEFT JOIN categories c ON c.id = d.category_id
+            {$joinBranch}
+            WHERE d.restaurant_id = ? {$catFilter}
+            ORDER BY d.sort_order, d.id DESC
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        if ($branchId) {
+            foreach ($rows as &$d) {
+                // Merge branch overrides into the display row
+                if (isset($d['branch_price']) && $d['branch_price'] !== null) {
+                    $d['price'] = floatval($d['branch_price']);
+                }
+                if (isset($d['branch_discount_percent']) && $d['branch_discount_percent'] !== null) {
+                    $d['discount_percent'] = floatval($d['branch_discount_percent']);
+                }
+                if (isset($d['branch_discount_active']) && $d['branch_discount_active'] !== null) {
+                    $d['discount_active'] = intval($d['branch_discount_active']);
+                }
+                if (isset($d['branch_is_available']) && $d['branch_is_available'] !== null) {
+                    $d['is_available'] = intval($d['branch_is_available']);
+                }
+                if (isset($d['branch_sold_out']) && $d['branch_sold_out'] !== null) {
+                    $d['sold_out'] = intval($d['branch_sold_out']);
+                }
+            }
+            unset($d);
+        }
+
+        return $rows;
     }
 
     /**
@@ -127,7 +168,7 @@ class DishService
      * @param array $files Uploaded files ($_FILES)
      * @return array ['success' => bool, 'id' => int, 'message' => string]
      */
-    public function create(int $restaurantId, array $data, array $files = []): array
+    public function create(int $restaurantId, array $data, array $files = [], ?int $branchId = null): array
     {
         $name         = trim($data['name'] ?? '');
         $nameEn       = trim($data['name_en'] ?? '');
@@ -215,6 +256,9 @@ class DishService
             error_log('DishService dual-write create failed: ' . $e->getMessage());
         }
 
+        // Sync discount to branch_dish_overrides (source of truth for menu)
+        $this->syncDiscountToBranches($dishId, $restaurantId, $discountPercent, $discountActive, $branchId);
+
         return ['success' => true, 'id' => $dishId, 'message' => 'تم إضافة الطبق بنجاح!'];
     }
 
@@ -225,7 +269,7 @@ class DishService
     /**
      * Update an existing dish.
      */
-    public function update(int $dishId, int $restaurantId, array $data, array $files = []): array
+    public function update(int $dishId, int $restaurantId, array $data, array $files = [], ?int $branchId = null): array
     {
         $name         = trim($data['name'] ?? '');
         $nameEn       = trim($data['name_en'] ?? '');
@@ -312,6 +356,9 @@ class DishService
             error_log('DishService dual-write update failed: ' . $e->getMessage());
         }
 
+        // Sync discount to branch_dish_overrides (source of truth for menu)
+        $this->syncDiscountToBranches($dishId, $restaurantId, $discountPercent, $discountActive, $branchId);
+
         return ['success' => true, 'message' => 'تم تعديل الطبق!'];
     }
 
@@ -370,22 +417,122 @@ class DishService
 
     /**
      * Toggle sold_out status.
+     *
+     * If $branchId is provided, toggles for that branch only via branch_dish_overrides.
+     * If NULL, toggles for ALL active branches of the restaurant.
+     * Also updates legacy `dishes.sold_out` for backward compatibility.
      */
-    public function toggleSoldOut(int $dishId, int $restaurantId): bool
+    public function toggleSoldOut(int $dishId, int $restaurantId, ?int $branchId = null): bool
     {
-        $this->db->prepare("UPDATE dishes SET sold_out = NOT sold_out WHERE id=? AND restaurant_id=?")
-            ->execute([$dishId, $restaurantId]);
+        // Verify dish belongs to restaurant
+        $check = $this->db->prepare("SELECT sold_out FROM dishes WHERE id=? AND restaurant_id=?");
+        $check->execute([$dishId, $restaurantId]);
+        $current = $check->fetchColumn();
+        if ($current === false) return false;
+
+        $newVal = $current ? 0 : 1;
+
+        // Legacy (dashboard display)
+        $this->db->prepare("UPDATE dishes SET sold_out = ? WHERE id=? AND restaurant_id=?")
+            ->execute([$newVal, $dishId, $restaurantId]);
+
+        // Branch-level (what customer menu reads)
+        if ($branchId) {
+            $this->upsertBranchOverride($branchId, $dishId, ['sold_out' => $newVal]);
+        } else {
+            $bStmt = $this->db->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1");
+            $bStmt->execute([$restaurantId]);
+            foreach ($bStmt->fetchAll() as $b) {
+                $this->upsertBranchOverride(intval($b['id']), $dishId, ['sold_out' => $newVal]);
+            }
+        }
+
         return true;
     }
 
     /**
      * Reset sold_out for all dishes in a restaurant.
+     * If $branchId is provided, resets only that branch's overrides.
+     * Otherwise resets legacy + all branches.
      */
-    public function resetAllSoldOut(int $restaurantId): bool
+    public function resetAllSoldOut(int $restaurantId, ?int $branchId = null): bool
     {
         $this->db->prepare("UPDATE dishes SET sold_out = 0 WHERE restaurant_id=?")
             ->execute([$restaurantId]);
+
+        if ($branchId) {
+            $this->db->prepare("
+                UPDATE branch_dish_overrides bdo
+                JOIN dishes d ON d.id = bdo.dish_id
+                SET bdo.sold_out = 0
+                WHERE bdo.branch_id = ? AND d.restaurant_id = ?
+            ")->execute([$branchId, $restaurantId]);
+        } else {
+            $this->db->prepare("
+                UPDATE branch_dish_overrides bdo
+                JOIN dishes d ON d.id = bdo.dish_id
+                SET bdo.sold_out = 0
+                WHERE d.restaurant_id = ?
+            ")->execute([$restaurantId]);
+        }
+
         return true;
+    }
+
+    /**
+     * Sync discount (percent + active) to branch_dish_overrides.
+     * Called from create/update after main dish write.
+     */
+    public function syncDiscountToBranches(int $dishId, int $restaurantId, float $discountPercent, int $discountActive, ?int $branchId = null): void
+    {
+        $fields = [
+            'discount_percent' => $discountPercent,
+            'discount_active'  => $discountActive,
+        ];
+
+        if ($branchId) {
+            $this->upsertBranchOverride($branchId, $dishId, $fields);
+            return;
+        }
+
+        $bStmt = $this->db->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1");
+        $bStmt->execute([$restaurantId]);
+        foreach ($bStmt->fetchAll() as $b) {
+            $this->upsertBranchOverride(intval($b['id']), $dishId, $fields);
+        }
+    }
+
+    /**
+     * UPSERT a branch_dish_overrides row with only the fields provided.
+     * Preserves other fields if row exists.
+     */
+    private function upsertBranchOverride(int $branchId, int $dishId, array $fields): void
+    {
+        if (empty($fields)) return;
+
+        // Check if row exists
+        $check = $this->db->prepare("SELECT id FROM branch_dish_overrides WHERE branch_id=? AND dish_id=?");
+        $check->execute([$branchId, $dishId]);
+        $exists = $check->fetchColumn();
+
+        if ($exists) {
+            $setParts = [];
+            $params = [];
+            foreach ($fields as $col => $val) {
+                $setParts[] = "`{$col}` = ?";
+                $params[] = $val;
+            }
+            $params[] = $exists;
+            $sql = "UPDATE branch_dish_overrides SET " . implode(', ', $setParts) . " WHERE id = ?";
+            $this->db->prepare($sql)->execute($params);
+        } else {
+            $cols = array_keys($fields);
+            $placeholders = array_fill(0, count($cols), '?');
+            $sql = "INSERT INTO branch_dish_overrides (branch_id, dish_id, " . implode(', ', array_map(fn($c) => "`{$c}`", $cols)) . ")
+                    VALUES (?, ?, " . implode(', ', $placeholders) . ")";
+            $params = array_merge([$branchId, $dishId], array_values($fields));
+            $this->db->prepare($sql)->execute($params);
+        }
     }
 
     // ============================================================

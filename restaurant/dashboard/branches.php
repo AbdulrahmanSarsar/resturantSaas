@@ -142,26 +142,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ===== جلب البيانات =====
+// orders.branch_id موجود بعد الترحيل — بنستخدمه مباشرة
 $branches_stmt = $pdo->prepare("
     SELECT b.*,
-        COUNT(DISTINCT o.id)                                              AS total_orders,
-        COUNT(DISTINCT CASE WHEN DATE(o.created_at)=CURDATE() THEN o.id END) AS today_orders,
-        ROUND(AVG(CASE WHEN DATE(o.created_at)=CURDATE() THEN o.total_price END), 0) AS avg_today,
-        COUNT(DISTINCT o.id) FILTER (WHERE o.status='pending')            AS pending_orders
-    FROM branches b
-    LEFT JOIN orders o ON o.restaurant_id = b.restaurant_id
-        AND JSON_EXTRACT(o.tax_details, '$.branch_id') = b.id
-    WHERE b.restaurant_id = ?
-    GROUP BY b.id
-    ORDER BY b.id ASC
-");
-// Fallback: الجدول orders ما فيه branch_id مباشرة — نستخدم orders_v2
-$branches_stmt = $pdo->prepare("
-    SELECT b.*,
-        (SELECT COUNT(*) FROM orders_v2 WHERE branch_id=b.id)                                     AS total_orders,
-        (SELECT COUNT(*) FROM orders_v2 WHERE branch_id=b.id AND DATE(created_at)=CURDATE())       AS today_orders,
-        (SELECT COUNT(*) FROM orders_v2 WHERE branch_id=b.id AND status='pending')                AS pending_orders,
-        (SELECT ROUND(AVG(total_price),0) FROM orders_v2 WHERE branch_id=b.id AND DATE(created_at)=CURDATE()) AS avg_today
+        (SELECT COUNT(*) FROM orders WHERE branch_id = b.id)                                          AS total_orders,
+        (SELECT COUNT(*) FROM orders WHERE branch_id = b.id AND DATE(created_at) = CURDATE())         AS today_orders,
+        (SELECT COUNT(*) FROM orders WHERE branch_id = b.id AND status = 'pending')                   AS pending_orders,
+        (SELECT ROUND(AVG(total_price),0) FROM orders WHERE branch_id = b.id AND DATE(created_at) = CURDATE()) AS avg_today
     FROM branches b
     WHERE b.restaurant_id = ?
     ORDER BY b.id ASC

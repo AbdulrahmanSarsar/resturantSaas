@@ -16,6 +16,7 @@ if(!isset($_SESSION['restaurant_id'])) {
 }
 
 $rid     = $_SESSION['restaurant_id'];
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $success = '';
 
 /** @var \MenuPro\Services\DishService $dishService */
@@ -30,12 +31,12 @@ $cats = $catService->getActiveForRestaurant($rid);
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if($_POST['action'] === 'add') {
-        $result = $dishService->create($rid, $_POST, $_FILES);
+        $result = $dishService->create($rid, $_POST, $_FILES, $active_branch_id);
         $success = $result['message'];
     }
 
     if($_POST['action'] === 'edit') {
-        $result = $dishService->update(intval($_POST['dish_id']), $rid, $_POST, $_FILES);
+        $result = $dishService->update(intval($_POST['dish_id']), $rid, $_POST, $_FILES, $active_branch_id);
         $success = $result['message'];
     }
 
@@ -50,13 +51,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if($_POST['action'] === 'reset_soldout') {
-        $dishService->resetAllSoldOut($rid);
+        $dishService->resetAllSoldOut($rid, $active_branch_id);
         $_SESSION['last_soldout_reset'] = date('Y-m-d');
         $success = 'تم إعادة تفعيل جميع الأطباق!';
     }
 
     if($_POST['action'] === 'toggle_soldout') {
-        $dishService->toggleSoldOut(intval($_POST['dish_id']), $rid);
+        $dishService->toggleSoldOut(intval($_POST['dish_id']), $rid, $active_branch_id);
         if(isset($_POST['ajax'])) { echo json_encode(['success'=>true]); exit; }
     }
 
@@ -68,7 +69,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // فلتر
 $filter_cat = intval($_GET['cat'] ?? 0);
-$dishes = $dishService->getAllForRestaurant($rid, $filter_cat ?: null);
+$dishes = $dishService->getAllForRestaurant($rid, $filter_cat ?: null, $active_branch_id);
 
 // كل الأطباق للقائمة في modal الاقتراحات
 $all_dishes = $dishService->getActiveForRestaurant($rid);
@@ -80,7 +81,6 @@ $sugg_map = $dishService->getSuggestionMap($rid);
 $options_map = $dishService->getOptionsMap($rid);
 
 require_once 'sidebar.php';
-?>
 ?>
 <style>
 /* ===== TOOLBAR ===== */
@@ -447,9 +447,19 @@ require_once 'sidebar.php';
     <?php endif; ?>
 
 <?php
-// شريط إشعار sold_out reset اليومي
-$sold_out_notice = $pdo->prepare("SELECT COUNT(*) as cnt FROM dishes WHERE restaurant_id=? AND sold_out=1");
-$sold_out_notice->execute([$rid]);
+// شريط إشعار sold_out reset اليومي — branch-aware
+if ($active_branch_id) {
+    $sold_out_notice = $pdo->prepare("
+        SELECT COUNT(*) as cnt
+        FROM branch_dish_overrides bdo
+        JOIN dishes d ON d.id = bdo.dish_id
+        WHERE bdo.branch_id = ? AND d.restaurant_id = ? AND bdo.sold_out = 1
+    ");
+    $sold_out_notice->execute([$active_branch_id, $rid]);
+} else {
+    $sold_out_notice = $pdo->prepare("SELECT COUNT(*) as cnt FROM dishes WHERE restaurant_id=? AND sold_out=1");
+    $sold_out_notice->execute([$rid]);
+}
 $sold_out_count = $sold_out_notice->fetchColumn();
 // تحقق إذا اليوم الحالي != آخر تاريخ reset (نستخدم session)
 $today = date('Y-m-d');
