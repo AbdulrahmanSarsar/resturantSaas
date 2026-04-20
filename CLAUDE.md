@@ -209,11 +209,11 @@ public_html/
 | `branch_dish_overrides` | سعر/توفر/discount/sold_out لكل فرع | |
 | `branches` | الفروع | `id`, `restaurant_id`, `name`, `name_en`, `slug`, `address`, `phone`, `is_active` |
 | `branch_settings` | إعدادات الفرع | ⚠️ **عندها `id` مستقل — سبب bug JOINs** |
-| `branch_taxes` | ضرائب per branch | |
+| `branch_taxes` | ضرائب per branch | **الـ primary** (taxes.php + OrderService) |
 | `restaurant_staff` | الموظفين | `branch_id` أُضيف |
 | `restaurants` | | `slug`, `currency`, `subscription_plan`, `subscription_expiry` |
-| `restaurant_taxes` | | legacy — لسا مستخدم |
-| `coupons` | | legacy — لم يُرحّل |
+| `restaurant_taxes` | | legacy — fallback فقط في OrderService + cart.php |
+| `coupons` | | `branch_id` أُضيف (graceful fallback للـ schema القديم) |
 | `users` | chain owners + admins | |
 | `dish_library` | reference data عام | |
 | `social_links` | روابط التواصل per branch | |
@@ -403,11 +403,19 @@ PLAN_RANK = ['basic' => 1, 'advanced' => 2, 'premium' => 3];
 - [ ] تعديل `profile.php` أو بناء `staff.php` لإضافة dropdown للفرع عند إضافة/تعديل موظف
 - [ ] **حرج:** بدون هاد، أي موظف جديد بـ `branch_id = NULL` ويشوف كل الفروع
 
-### Phase 10 — Features Enhancement
-- [ ] `ratings.php` branch-aware
-- [ ] `coupons.php` — ترحيل لـ v2 أو استمرار مع القديم
-- [ ] `branch_settings.php` polish (UI tweaks)
-- [ ] إعدادات طرق الدفع per branch
+### Phase 10 — Features Enhancement ✅
+- [x] `ratings.php` branch-aware
+- [x] `coupons.php` — branch_id + graceful fallback
+- [x] `branch_settings.php` fix missing branch_helper
+- [x] `offers.php` — migrated to `offers_v2` (كان bug إنتاج)
+- [x] `index.php` (dashboard home) — branch-aware + `dishes_v2`/`categories_v2`
+- [x] `api/new_orders.php` — branch-aware (owner + staff)
+- [x] OrderService + cart.php — tax fallback (`branch_taxes` → `restaurant_taxes`)
+
+### Phase 11 — Per-branch Taxes ✅
+- [x] `taxes.php` — per-branch UI (dropdown + branch badge)
+- [x] Migration: `restaurant_taxes` → `branch_taxes` لكل فرع
+- [x] Validation via `tax_belongs_to_restaurant` (ownership check)
 
 ### Phase 12 — Testing & Polish
 - [ ] End-to-end testing شامل (طلب كامل من الزبون → مطبخ → نادل → كاشير)

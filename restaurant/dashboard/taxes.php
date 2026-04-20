@@ -6,18 +6,53 @@ $rid     = $_SESSION['restaurant_id'];
 $success = '';
 $error   = '';
 
+// ===== الفروع + الفرع النشط =====
+$active_branches = [];
+$bstmt = $pdo->prepare("SELECT id, name FROM branches WHERE restaurant_id = ? AND is_active = 1 ORDER BY id ASC");
+$bstmt->execute([$rid]);
+$active_branches = $bstmt->fetchAll();
+
+$active_branch_id   = $_SESSION['active_branch_id'] ?? null;
+$active_branch_name = '';
+if ($active_branch_id) {
+    foreach ($active_branches as $b) {
+        if ($b['id'] == $active_branch_id) { $active_branch_name = $b['name']; break; }
+    }
+}
+
+// Helper: تحقق إن الفرع تبع هالمطعم
+$validate_branch = function($branch_id) use ($pdo, $rid) {
+    if (!$branch_id) return null;
+    $chk = $pdo->prepare("SELECT id FROM branches WHERE id = ? AND restaurant_id = ? AND is_active = 1");
+    $chk->execute([$branch_id, $rid]);
+    return $chk->fetch() ? (int)$branch_id : null;
+};
+
+// Helper: تحقق إن الضريبة تبع فرع تبع هالمطعم (قبل UPDATE/DELETE)
+$tax_belongs_to_restaurant = function($tax_id) use ($pdo, $rid) {
+    $chk = $pdo->prepare("
+        SELECT bt.id FROM branch_taxes bt
+        JOIN branches b ON b.id = bt.branch_id
+        WHERE bt.id = ? AND b.restaurant_id = ?
+    ");
+    $chk->execute([$tax_id, $rid]);
+    return (bool)$chk->fetch();
+};
+
 // ===== POST HANDLER =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if($_POST['action'] === 'add') {
+        $branch_id = $validate_branch(intval($_POST['branch_id'] ?? ($active_branch_id ?? 0)));
         $name    = trim($_POST['name']    ?? '');
         $name_en = trim($_POST['name_en'] ?? '');
         $type    = in_array($_POST['type']??'', ['percentage','fixed']) ? $_POST['type'] : 'percentage';
         $value   = floatval($_POST['value'] ?? 0);
         $sort    = intval($_POST['sort_order'] ?? 0);
-        if($name && $value >= 0) {
-            $pdo->prepare("INSERT INTO restaurant_taxes (restaurant_id,name,name_en,type,value,sort_order) VALUES (?,?,?,?,?,?)")
-                ->execute([$rid, $name, $name_en, $type, $value, $sort]);
+        if(!$branch_id) { $error = 'الرجاء اختيار فرع صحيح.'; }
+        elseif($name && $value >= 0) {
+            $pdo->prepare("INSERT INTO branch_taxes (branch_id,name,name_en,type,value,sort_order,is_active) VALUES (?,?,?,?,?,?,1)")
+                ->execute([$branch_id, $name, $name_en, $type, $value, $sort]);
             $success = 'تمت إضافة الضريبة بنجاح!';
         } else { $error = 'يرجى تعبئة الاسم والقيمة.'; }
     }
@@ -30,20 +65,26 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $value   = floatval($_POST['value'] ?? 0);
         $sort    = intval($_POST['sort_order'] ?? 0);
         $active  = isset($_POST['is_active']) ? 1 : 0;
-        $pdo->prepare("UPDATE restaurant_taxes SET name=?,name_en=?,type=?,value=?,sort_order=?,is_active=? WHERE id=? AND restaurant_id=?")
-            ->execute([$name, $name_en, $type, $value, $sort, $active, $tid, $rid]);
-        $success = 'تم تعديل الضريبة!';
+        if($tax_belongs_to_restaurant($tid)) {
+            $pdo->prepare("UPDATE branch_taxes SET name=?,name_en=?,type=?,value=?,sort_order=?,is_active=? WHERE id=?")
+                ->execute([$name, $name_en, $type, $value, $sort, $active, $tid]);
+            $success = 'تم تعديل الضريبة!';
+        } else { $error = 'الضريبة غير موجودة'; }
     }
 
     if($_POST['action'] === 'delete') {
-        $pdo->prepare("DELETE FROM restaurant_taxes WHERE id=? AND restaurant_id=?")
-            ->execute([intval($_POST['tax_id']), $rid]);
-        $success = 'تم حذف الضريبة!';
+        $tid = intval($_POST['tax_id']);
+        if($tax_belongs_to_restaurant($tid)) {
+            $pdo->prepare("DELETE FROM branch_taxes WHERE id=?")->execute([$tid]);
+            $success = 'تم حذف الضريبة!';
+        }
     }
 
     if($_POST['action'] === 'toggle') {
-        $pdo->prepare("UPDATE restaurant_taxes SET is_active=NOT is_active WHERE id=? AND restaurant_id=?")
-            ->execute([intval($_POST['tax_id']), $rid]);
+        $tid = intval($_POST['tax_id']);
+        if($tax_belongs_to_restaurant($tid)) {
+            $pdo->prepare("UPDATE branch_taxes SET is_active = NOT is_active WHERE id=?")->execute([$tid]);
+        }
         if(isset($_POST['ajax'])) { echo json_encode(['success'=>true]); exit; }
     }
 
@@ -53,8 +94,28 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     exit;
 }
 
-$taxes = $pdo->prepare("SELECT * FROM restaurant_taxes WHERE restaurant_id=? ORDER BY sort_order,id");
-$taxes->execute([$rid]);
+// ===== جلب الضرائب =====
+// إذا في فرع نشط → ضرائبه فقط
+// إذا ما في → كل الضرائب للمطعم (مع عمود branch_name)
+if ($active_branch_id) {
+    $taxes = $pdo->prepare("
+        SELECT bt.*, b.name AS branch_name
+        FROM branch_taxes bt
+        JOIN branches b ON b.id = bt.branch_id
+        WHERE bt.branch_id = ?
+        ORDER BY bt.sort_order, bt.id
+    ");
+    $taxes->execute([$active_branch_id]);
+} else {
+    $taxes = $pdo->prepare("
+        SELECT bt.*, b.name AS branch_name
+        FROM branch_taxes bt
+        JOIN branches b ON b.id = bt.branch_id
+        WHERE b.restaurant_id = ?
+        ORDER BY b.id, bt.sort_order, bt.id
+    ");
+    $taxes->execute([$rid]);
+}
 $taxes = $taxes->fetchAll();
 
 // قراءة رسائل الـ redirect
@@ -164,13 +225,31 @@ require_once 'sidebar.php';
 
 <div class="taxes-toolbar">
     <div>
-        <div class="page-title">الضرائب والرسوم</div>
+        <div class="page-title">
+            الضرائب والرسوم
+            <?php if($active_branch_name): ?>
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(255,107,53,0.12);color:var(--p);border-radius:20px;font-size:12px;font-weight:700;margin-inline-start:8px;vertical-align:middle;">
+                📍 <?= htmlspecialchars($active_branch_name) ?>
+            </span>
+            <?php elseif(!empty($active_branches)): ?>
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:var(--bg3);color:var(--ink2);border-radius:20px;font-size:12px;font-weight:700;margin-inline-start:8px;vertical-align:middle;">
+                🌐 كل الفروع
+            </span>
+            <?php endif; ?>
+        </div>
         <div class="page-subtitle"><?= count($taxes) ?> ضريبة/رسم مسجل</div>
     </div>
-    <button class="btn btn-primary" onclick="document.getElementById('addCard').classList.toggle('open')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        إضافة ضريبة
-    </button>
+    <?php if(empty($active_branches)): ?>
+        <a href="branches.php" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            أضف فرع أولاً
+        </a>
+    <?php else: ?>
+        <button class="btn btn-primary" onclick="document.getElementById('addCard').classList.toggle('open')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            إضافة ضريبة
+        </button>
+    <?php endif; ?>
 </div>
 
 <?php if($success): ?>
@@ -189,6 +268,14 @@ require_once 'sidebar.php';
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="type" id="addTypeVal" value="percentage">
         <div class="form-row-2">
+            <div class="form-group" style="margin:0">
+                <label>الفرع *</label>
+                <select name="branch_id" required style="width:100%;padding:11px 14px;background:var(--bg3);border:1.5px solid var(--line);border-radius:12px;color:var(--ink);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;">
+                    <?php foreach($active_branches as $b): ?>
+                    <option value="<?= $b['id'] ?>" <?= $active_branch_id == $b['id'] ? 'selected' : '' ?>><?= htmlspecialchars($b['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div class="form-group" style="margin:0">
                 <label>الاسم (عربي) *</label>
                 <input type="text" name="name" placeholder="مثال: ضريبة القيمة المضافة" required>
@@ -271,6 +358,11 @@ require_once 'sidebar.php';
                 <span class="dot"></span>
                 <?= $tax['is_active'] ? 'مفعّل' : 'معطّل' ?>
             </span>
+            <?php if(!$active_branch_id && !empty($tax['branch_name'])): ?>
+            <span style="font-size:11px;color:var(--p);background:rgba(255,107,53,0.1);padding:3px 8px;border-radius:10px;font-weight:700;">
+                📍 <?= htmlspecialchars($tax['branch_name']) ?>
+            </span>
+            <?php endif; ?>
             <span style="font-size:11px;color:var(--ink2);font-weight:600;">ترتيب: <?= $tax['sort_order'] ?></span>
         </div>
 
