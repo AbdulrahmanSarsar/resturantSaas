@@ -11,9 +11,8 @@
  *
  * يقرأ من:
  *   - branches (الفروع)
- *   - orders_v2 (الطلبات الجديدة — مع branch_id)
- *   - orders (legacy — fallback للبيانات القديمة)
- *   - order_items / order_items_v2
+ *   - orders (المصدر الوحيد — مع branch_id)
+ *   - order_items
  */
 require_once __DIR__ . '/../../bootstrap.php';
 require_once __DIR__ . '/plan_guard.php';

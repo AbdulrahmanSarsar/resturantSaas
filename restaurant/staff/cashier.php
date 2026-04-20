@@ -65,38 +65,18 @@ $date_filter = $_GET['date'] ?? 'today';
 $where_date  = $date_filter === 'today' ? "AND DATE(o.created_at)=CURDATE()" : '';
 
 if($branch_id) {
-    // نجيب legacy_order_id من orders_v2 ثم نجيب الطلبات من orders
-    $branch_order_ids = $pdo->prepare("
-        SELECT legacy_order_id FROM orders_v2
-        WHERE restaurant_id=? AND branch_id=?
-          AND legacy_order_id IS NOT NULL
+    // branch-filtered عبر orders.branch_id مباشرة (بعد ما orders_v2 أُهجر)
+    $orders_stmt = $pdo->prepare("
+        SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num
+        FROM orders o
+        WHERE o.restaurant_id=?
+          AND o.branch_id=?
+          AND o.status='delivered'
+          AND o.payment_status='unpaid'
+          $where_date
+        ORDER BY o.created_at DESC
     ");
-    $branch_order_ids->execute([$rid, $branch_id]);
-    $ids = array_column($branch_order_ids->fetchAll(), 'legacy_order_id');
-
-    if(!empty($ids)) {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $orders_stmt = $pdo->prepare("
-            SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num
-            FROM orders o
-            WHERE o.id IN ($placeholders)
-              AND o.status='delivered'
-              AND o.payment_status='unpaid'
-              $where_date
-            ORDER BY o.created_at DESC
-        ");
-        $orders_stmt->execute($ids);
-    } else {
-        // لو ما في طلبات v2 → fallback على orders عادي
-        $orders_stmt = $pdo->prepare("
-            SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num
-            FROM orders o
-            WHERE o.restaurant_id=? AND o.status='delivered'
-              AND o.payment_status='unpaid' $where_date
-            ORDER BY o.created_at DESC
-        ");
-        $orders_stmt->execute([$rid]);
-    }
+    $orders_stmt->execute([$rid, $branch_id]);
 } else {
     $orders_stmt = $pdo->prepare("
         SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num

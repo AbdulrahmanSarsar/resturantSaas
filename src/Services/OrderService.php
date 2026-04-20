@@ -1,15 +1,20 @@
 <?php
 /**
  * MenuPro — Order Service
- * 
- * Centralizes ALL order business logic that was scattered across:
- *   cart.php (order creation, tax calculation, coupon handling)
- *   kitchen.php (status updates)
- *   waiter.php (delivery marking)
- *   cashier.php (payment processing)
- * 
- * This is the single source of truth for order operations.
- * No other file should directly modify the orders table.
+ *
+ * ⚠️ DEPRECATED — NOT PLUGGED IN ⚠️
+ *   هاد الـ service انبنى لـ refactor المخطّط بس ما استُخدم أبداً.
+ *   cart.php / kitchen.php / waiter.php / cashier.php كلهم بيشتغلوا مباشرة
+ *   على جدول `orders` (المصدر الوحيد بعد إهمال orders_v2).
+ *
+ *   الـ queries تحت بتستخدم orders_v2 (المهجور) و columns ما موجودة في `orders`.
+ *   ما تستدعي هاد الـ service حالياً — استخدم PDO مباشرة زي cart.php.
+ *
+ *   TODO: اعادة كتابة comprehensive لاستخدام `orders` + branch_id + branch_taxes
+ *         كجزء من مرحلة مستقبلية (service layer refactor).
+ *
+ * Tax calculation logic (branch_taxes fallback to restaurant_taxes) موجود
+ * في هاد الـ service كـ reference لـ cart.php.
  */
 
 namespace MenuPro\Services;

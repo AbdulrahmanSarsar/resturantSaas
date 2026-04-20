@@ -46,7 +46,7 @@ if ($selected_branch) {
             COUNT(*)                                                             AS total_orders,
             SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END)     AS today_orders,
             COUNT(DISTINCT table_number)                                         AS unique_tables
-        FROM orders_v2
+        FROM orders
         WHERE restaurant_id = ? AND branch_id = ?
     ");
     $stats_stmt->execute([$rid, $active_branch_id]);

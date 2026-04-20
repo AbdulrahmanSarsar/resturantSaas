@@ -5,7 +5,7 @@
  * التغييرات:
  *   - يقرأ من جدول users بدل restaurants
  *   - يستخدم AuthMiddleware مع roles: chain_owner, restaurant_manager, branch_manager
- *   - يتحقق من انتهاء الاشتراك عبر subscriptions_v2
+ *   - يتحقق من انتهاء الاشتراك عبر restaurants.subscription_expiry
  *   - يضيف CSRF token
  *   - نفس التصميم بالضبط
  */
@@ -28,18 +28,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $auth->attemptWithRoles($email, $password, ['chain_owner', 'restaurant_manager', 'branch_manager']);
 
         if($user) {
-            // تحقق من الاشتراك
+            // تحقق من الاشتراك من restaurants.subscription_expiry
             $orgId = $user['organization_id'];
             if($orgId) {
                 $subStmt = $pdo->prepare("
-                    SELECT end_date FROM subscriptions_v2 
-                    WHERE organization_id = ? AND is_active = 1 
-                    ORDER BY end_date DESC LIMIT 1
+                    SELECT subscription_expiry AS end_date
+                    FROM restaurants
+                    WHERE organization_id = ?
+                    ORDER BY subscription_expiry DESC LIMIT 1
                 ");
                 $subStmt->execute([$orgId]);
                 $sub = $subStmt->fetch();
-                
-                if($sub && $sub['end_date'] < date('Y-m-d')) {
+
+                if($sub && $sub['end_date'] && $sub['end_date'] < date('Y-m-d')) {
                     // اشتراك منتهي — سجّل خروج وأظهر خطأ
                     $auth->logout();
                     $error = 'انتهى اشتراكك! تواصل مع الإدارة لتجديده.';

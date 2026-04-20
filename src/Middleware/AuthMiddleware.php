@@ -85,7 +85,7 @@ class AuthMiddleware
                    o.name AS organization_name
             FROM users u
             LEFT JOIN branches b ON b.id = u.branch_id
-            LEFT JOIN restaurants_v2 rv ON rv.id = u.restaurant_id
+            LEFT JOIN restaurants rv ON rv.id = u.restaurant_id
             LEFT JOIN organizations o ON o.id = u.organization_id
             WHERE u.id = ? AND u.is_active = 1
         ");
@@ -139,7 +139,7 @@ class AuthMiddleware
                    rv.name AS restaurant_name,
                    o.name AS organization_name
             FROM users u
-            LEFT JOIN restaurants_v2 rv ON rv.id = u.restaurant_id
+            LEFT JOIN restaurants rv ON rv.id = u.restaurant_id
             LEFT JOIN organizations o ON o.id = u.organization_id
             WHERE (u.email = ? OR u.username = ?) AND u.is_active = 1 $roleFilter
             LIMIT 1
@@ -221,20 +221,25 @@ class AuthMiddleware
 
     /**
      * Get the active subscription plan for an organization.
+     *
+     * بعد إهمال subscriptions_v2 — نقرأ من restaurants.subscription_plan مباشرة.
+     * (restaurant-level plans، organization-wide lookup يبقى أول مطعم نشط)
      */
     private function getActivePlan(?int $orgId): string
     {
         if (!$orgId) return 'basic';
 
         $stmt = $this->db->prepare("
-            SELECT plan FROM subscriptions_v2 
-            WHERE organization_id = ? AND is_active = 1 AND end_date >= CURDATE()
-            ORDER BY end_date DESC LIMIT 1
+            SELECT subscription_plan AS plan
+            FROM restaurants
+            WHERE organization_id = ?
+              AND (subscription_expiry IS NULL OR subscription_expiry >= CURDATE())
+            ORDER BY subscription_expiry DESC LIMIT 1
         ");
         $stmt->execute([$orgId]);
         $sub = $stmt->fetch();
 
-        return $sub ? $sub['plan'] : 'basic';
+        return ($sub && $sub['plan']) ? $sub['plan'] : 'basic';
     }
 
     /**
@@ -335,7 +340,7 @@ class AuthMiddleware
         if ($role === 'chain_owner') {
             $stmt = $this->db->prepare("
                 SELECT 1 FROM branches b
-                JOIN restaurants_v2 r ON r.id = b.restaurant_id
+                JOIN restaurants r ON r.id = b.restaurant_id
                 WHERE b.id = ? AND r.organization_id = ?
             ");
             $stmt->execute([$branchId, $this->currentUser['organization_id']]);
@@ -374,7 +379,7 @@ class AuthMiddleware
         if ($role === 'chain_owner') {
             $stmt = $this->db->prepare("
                 SELECT b.id FROM branches b
-                JOIN restaurants_v2 r ON r.id = b.restaurant_id
+                JOIN restaurants r ON r.id = b.restaurant_id
                 WHERE r.organization_id = ?
             ");
             $stmt->execute([$this->currentUser['organization_id']]);

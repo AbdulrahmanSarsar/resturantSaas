@@ -5,11 +5,9 @@
  * كل استعلامات التقارير والإحصائيات بمكان واحد.
  * 
  * استراتيجية خلال فترة الترحيل:
- *   - يستخدم orders_v2 (الجدول الجديد) — فيه كل البيانات عبر dual-write
+ *   - يستخدم orders (المصدر الوحيد بعد إسقاط orders_v2) + branch_id column
  *   - branches table للفروع
  *   - restaurant_staff للموظفين (مش users) لأنو هو المستخدم فعلياً بالصفحات الحالية
- * 
- * ملاحظة مستقبلية: بعد المرحلة 4-5 الكاملة، رح نستخدم users table بدل restaurant_staff.
  */
 
 namespace MenuPro\Services;
@@ -57,7 +55,7 @@ class ReportService
                 SUM(CASE WHEN o.payment_status = 'paid'   THEN 1 ELSE 0 END) AS paid_count,
                 COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total_price END), 0) AS paid_revenue
             FROM branches b
-            LEFT JOIN orders_v2 o 
+            LEFT JOIN orders o 
                 ON o.branch_id = b.id 
                 AND DATE(o.created_at) >= ?
             WHERE b.restaurant_id = ?
@@ -83,7 +81,7 @@ class ReportService
                 b.name AS branch_name,
                 HOUR(o.created_at) AS hour,
                 COUNT(*) AS orders
-            FROM orders_v2 o
+            FROM orders o
             JOIN branches b ON b.id = o.branch_id
             WHERE b.restaurant_id = ? 
               AND DATE(o.created_at) >= ?
@@ -110,8 +108,8 @@ class ReportService
 
     /**
      * أداء الموظفين عبر كل الفروع.
-     * 
-     * يستخدم orders_v2 (الجدول الجديد) عبر dual-write.
+     *
+     * يستخدم orders (المصدر الوحيد) مع staff_id/cashier_id columns.
      * restaurant_staff للموظفين لأنو هو المرتبط فعلياً بالـ staff_id / cashier_id.
      * 
      * @return array
@@ -131,7 +129,7 @@ class ReportService
                 COUNT(DISTINCT CASE WHEN o.cashier_id = rs.id THEN o.id END) AS payments
             FROM restaurant_staff rs
             LEFT JOIN branches b ON b.id = rs.branch_id
-            LEFT JOIN orders_v2 o 
+            LEFT JOIN orders o 
                 ON (o.staff_id = rs.id OR o.cashier_id = rs.id)
                 AND DATE(o.created_at) >= ?
             WHERE rs.restaurant_id = ? 
@@ -159,7 +157,7 @@ class ReportService
                 SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
                 SUM(CASE WHEN o.status = 'delivered' THEN 1 ELSE 0 END) AS delivered,
                 (SELECT COUNT(*) FROM branches WHERE restaurant_id = ? AND is_active = 1) AS active_branches
-            FROM orders_v2 o
+            FROM orders o
             JOIN branches b ON b.id = o.branch_id
             WHERE b.restaurant_id = ? 
               AND DATE(o.created_at) >= ?

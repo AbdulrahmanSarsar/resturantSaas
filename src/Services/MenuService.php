@@ -318,8 +318,8 @@ class MenuService
                 r.*, 
                 DATE_FORMAT(r.created_at, '%d/%m/%Y') AS date_fmt,
                 o.table_number
-            FROM order_ratings_v2 r
-            JOIN orders_v2 o ON o.id = r.order_id
+            FROM order_ratings r
+            JOIN orders o ON o.id = r.order_id
             WHERE r.restaurant_id = ? AND r.favorite_dish_id = ?
             ORDER BY r.created_at DESC
         ");
@@ -341,7 +341,7 @@ class MenuService
                 SUM(r.rating = 3)       AS r3,
                 SUM(r.rating = 2)       AS r2,
                 SUM(r.rating = 1)       AS r1
-            FROM order_ratings_v2 r
+            FROM order_ratings r
             WHERE r.restaurant_id = ? AND r.favorite_dish_id = ?
         ");
         $stmt->execute([$restaurantId, $dishId]);
