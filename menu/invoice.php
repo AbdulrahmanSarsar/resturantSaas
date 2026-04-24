@@ -67,7 +67,7 @@ $discount = floatval($order['discount_amount'] ?? 0);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<?php $display_order_num = $order['restaurant_order_number'] ?? $order_id; ?>
+<?php $display_order_num = $order['branch_order_number'] ?? $order['restaurant_order_number'] ?? $order_id; ?>
 <title>فاتورة #<?= $display_order_num ?> — <?= htmlspecialchars($restaurant['name']) ?></title>
 <script>(function(){ var t=localStorage.getItem('menu_theme_<?= $slug ?>')||'light'; document.documentElement.setAttribute('data-theme',t); })();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">

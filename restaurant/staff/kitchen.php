@@ -143,7 +143,7 @@ if(false) { // placeholder
     try {
         if($branch_id) {
             $orders_stmt = $pdo->prepare("
-                SELECT *, COALESCE(restaurant_order_number, id) as display_num
+                SELECT *, COALESCE(branch_order_number, restaurant_order_number, id) as display_num
                 FROM orders
                 WHERE restaurant_id=? AND branch_id=? AND status IN ('pending','confirmed','preparing')
                 ORDER BY created_at ASC
@@ -151,7 +151,7 @@ if(false) { // placeholder
             $orders_stmt->execute([$rid, $branch_id]);
         } else {
             $orders_stmt = $pdo->prepare("
-                SELECT *, COALESCE(restaurant_order_number, id) as display_num
+                SELECT *, COALESCE(branch_order_number, restaurant_order_number, id) as display_num
                 FROM orders
                 WHERE restaurant_id=? AND status IN ('pending','confirmed','preparing')
                 ORDER BY created_at ASC
@@ -161,7 +161,7 @@ if(false) { // placeholder
     } catch(\Exception $e) {
         // عمود branch_id مش موجود بعد → كل الطلبات
         $orders_stmt = $pdo->prepare("
-            SELECT *, COALESCE(restaurant_order_number, id) as display_num
+            SELECT *, COALESCE(branch_order_number, restaurant_order_number, id) as display_num
             FROM orders
             WHERE restaurant_id=? AND status IN ('pending','confirmed','preparing')
             ORDER BY created_at ASC

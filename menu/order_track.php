@@ -13,7 +13,7 @@ $stmt = $pdo->prepare("SELECT o.* FROM orders o WHERE o.id=? AND o.restaurant_id
 $stmt->execute([$order_id, $restaurant['id']]);
 $order = $stmt->fetch();
 if(!$order) { http_response_code(404); die('الطلب غير موجود'); }
-$display_order_num = $order['restaurant_order_number'] ?? $order_id;
+$display_order_num = $order['branch_order_number'] ?? $order['restaurant_order_number'] ?? $order_id;
 
 // ===== العملة =====
 $cur_symbol    = $restaurant['currency_symbol']    ?? '$';

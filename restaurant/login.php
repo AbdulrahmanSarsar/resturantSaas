@@ -28,25 +28,39 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $auth->attemptWithRoles($email, $password, ['chain_owner', 'restaurant_manager', 'branch_manager']);
 
         if($user) {
-            // تحقق من الاشتراك من restaurants.subscription_expiry
-            $orgId = $user['organization_id'];
-            if($orgId) {
+            // تحقق من الاشتراك: restaurant_id أولاً (مضمون)
+            // organization_id fallback فقط لو العمود موجود (ما بكل الـ DBs)
+            $restId = $user['restaurant_id'] ?? null;
+            $orgId  = $user['organization_id'] ?? null;
+            $sub = null;
+
+            if ($restId) {
                 $subStmt = $pdo->prepare("
                     SELECT subscription_expiry AS end_date
                     FROM restaurants
-                    WHERE organization_id = ?
-                    ORDER BY subscription_expiry DESC LIMIT 1
+                    WHERE id = ? LIMIT 1
                 ");
-                $subStmt->execute([$orgId]);
+                $subStmt->execute([$restId]);
                 $sub = $subStmt->fetch();
+            } elseif ($orgId) {
+                try {
+                    $chk = $pdo->query("SHOW COLUMNS FROM restaurants LIKE 'organization_id'");
+                    if ($chk && $chk->rowCount() > 0) {
+                        $subStmt = $pdo->prepare("
+                            SELECT subscription_expiry AS end_date
+                            FROM restaurants
+                            WHERE organization_id = ?
+                            ORDER BY subscription_expiry DESC LIMIT 1
+                        ");
+                        $subStmt->execute([$orgId]);
+                        $sub = $subStmt->fetch();
+                    }
+                } catch (\Throwable $e) { /* skip */ }
+            }
 
-                if($sub && $sub['end_date'] && $sub['end_date'] < date('Y-m-d')) {
-                    // اشتراك منتهي — سجّل خروج وأظهر خطأ
-                    $auth->logout();
-                    $error = 'انتهى اشتراكك! تواصل مع الإدارة لتجديده.';
-                } else {
-                    header('Location: dashboard/index.php'); exit;
-                }
+            if ($sub && $sub['end_date'] && $sub['end_date'] < date('Y-m-d')) {
+                $auth->logout();
+                $error = 'انتهى اشتراكك! تواصل مع الإدارة لتجديده.';
             } else {
                 header('Location: dashboard/index.php'); exit;
             }

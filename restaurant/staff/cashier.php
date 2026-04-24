@@ -69,7 +69,7 @@ $where_date  = $date_filter === 'today' ? "AND DATE(o.created_at)=CURDATE()" : '
 if($branch_id) {
     // branch-filtered عبر orders.branch_id مباشرة (بعد ما orders_v2 أُهجر)
     $orders_stmt = $pdo->prepare("
-        SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num
+        SELECT o.*, COALESCE(o.branch_order_number, o.restaurant_order_number, o.id) as display_num
         FROM orders o
         WHERE o.restaurant_id=?
           AND o.branch_id=?
@@ -81,7 +81,7 @@ if($branch_id) {
     $orders_stmt->execute([$rid, $branch_id]);
 } else {
     $orders_stmt = $pdo->prepare("
-        SELECT o.*, COALESCE(o.restaurant_order_number, o.id) as display_num
+        SELECT o.*, COALESCE(o.branch_order_number, o.restaurant_order_number, o.id) as display_num
         FROM orders o
         WHERE o.restaurant_id=?
           AND o.status='delivered'

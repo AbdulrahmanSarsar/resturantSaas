@@ -59,9 +59,14 @@ $active_branch_name = $_SESSION['active_branch_name'] ?? 'الفرع الرئي�
 $active_branch_slug = $_SESSION['active_branch_slug'] ?? '';
 $has_multiple       = count($branches_list) > 1;
 
-// ===== إحصائيات =====
-$pending_count = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND status = 'pending'");
-$pending_count->execute([$rid]);
+// ===== إحصائيات — branch-aware =====
+if ($active_branch_id) {
+    $pending_count = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND branch_id = ? AND status = 'pending'");
+    $pending_count->execute([$rid, $active_branch_id]);
+} else {
+    $pending_count = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND status = 'pending'");
+    $pending_count->execute([$rid]);
+}
 $pending_count = $pending_count->fetchColumn();
 
 $plans      = ['basic' => '🥉 أساسية', 'advanced' => '🥈 متقدمة', 'premium' => '⭐ بريميوم'];
@@ -418,7 +423,7 @@ $icons_svg = [
 
     <!-- Footer — دايماً ظاهر بالأسفل -->
     <div class="sb-footer">
-        <a href="<?= BASE_URL ?>/menu/<?= $restaurant_data['slug'] ?><?= $active_branch_slug ? '/' . $active_branch_slug : '' ?>"
+        <a href="<?= BASE_URL ?>/menu/<?= rawurlencode($restaurant_data['slug']) ?><?= $active_branch_slug ? '/' . rawurlencode($active_branch_slug) : '' ?>"
            target="_blank" class="sb-footer-btn btn-preview">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             معاينة المنيو

@@ -288,7 +288,7 @@ require_once 'sidebar.php';
 
         <!-- HEADER -->
         <div class="order-head">
-            <div class="order-num">#<?= $o['restaurant_order_number'] ?? $o['id'] ?></div>
+            <div class="order-num">#<?= $o['branch_order_number'] ?? $o['restaurant_order_number'] ?? $o['id'] ?></div>
             <div class="order-table-chip">🪑 طاولة <?= htmlspecialchars($o['table_number']) ?></div>
             <?php if($o['customer_name']): ?>
             <div class="order-customer">
@@ -386,10 +386,17 @@ function updateStatus(orderId, status, btn) {
         if(d.success) {
             const card = document.getElementById('order-' + orderId);
             if(card) {
-                card.style.transition = 'opacity .3s, transform .3s';
-                card.style.opacity = '0';
-                card.style.transform = 'translateX(-10px)';
-                setTimeout(() => { card.remove(); }, 300);
+                const activeFilter = <?= json_encode($filter) ?>;
+                // إذا الفلتر الحالي ما بيطابق الحالة الجديدة، أخفي الكارد
+                if (activeFilter !== 'all' && activeFilter !== status) {
+                    card.style.transition = 'opacity .3s, transform .3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-10px)';
+                    setTimeout(() => { card.remove(); }, 300);
+                } else {
+                    // حدث الكارد inline: class + badge + أزرار
+                    updateCardInline(card, status);
+                }
             }
         } else {
             btn.disabled = false;
@@ -402,6 +409,37 @@ function updateStatus(orderId, status, btn) {
         btn.classList.remove('loading');
         btn.textContent = orig;
     });
+}
+
+const STATUS_META = <?= json_encode([
+    'labels' => $status_labels ?? ['pending'=>'معلق','confirmed'=>'مؤكد','preparing'=>'بالتحضير','ready'=>'جاهز','delivered'=>'تم التسليم','cancelled'=>'ملغي'],
+    'icons'  => $status_icons  ?? ['pending'=>'⏳','confirmed'=>'✓','preparing'=>'⚡','ready'=>'🍽️','delivered'=>'✅','cancelled'=>'❌'],
+    'next'   => $status_next   ?? [],
+]) ?>;
+
+function updateCardInline(card, newStatus) {
+    // 1) Class على الكارد (للـ color stripe)
+    card.className = card.className.replace(/status-\w+/g, '') + ' status-' + newStatus;
+    card.classList.add('order-card');
+
+    // 2) Badge
+    const badge = card.querySelector('.status-badge');
+    if (badge) {
+        badge.className = 'status-badge badge-' + newStatus;
+        const icon  = STATUS_META.icons[newStatus]  || '';
+        const label = STATUS_META.labels[newStatus] || newStatus;
+        badge.innerHTML = icon + ' ' + label;
+    }
+
+    // 3) أزرار الأكشن
+    const btnsBox = card.querySelector('.status-btns');
+    if (btnsBox) {
+        const orderId = card.id.replace('order-', '');
+        const nextList = STATUS_META.next[newStatus] || [];
+        btnsBox.innerHTML = nextList.map(([ns, lbl, cls]) =>
+            `<button class="status-btn ${cls}" onclick="updateStatus(${orderId},'${ns}',this)">${lbl}</button>`
+        ).join('');
+    }
 }
 
 // Sound

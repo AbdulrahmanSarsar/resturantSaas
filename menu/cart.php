@@ -250,8 +250,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['items'])) {
             $grand_total = round($final_total + $tax_amount, 2);
 
             // ===== كتابة الطلب — orders مع branch_id =====
-            $pdo->prepare("INSERT INTO orders (restaurant_id,branch_id,table_number,customer_name,customer_notes,total_price,coupon_code,discount_amount,tax_amount,tax_details,status) VALUES (?,?,?,?,?,?,?,?,?,?,'pending')")
-                ->execute([$rid,$branch_id,$table,$customer,$notes,$grand_total,$coupon_code?:null,round($discount_amt,2),round($tax_amount,2),json_encode($tax_details)]);
+            // branch_order_number = MAX+1 per-branch (عداد مستقل لكل فرع)
+            $bnum_stmt = $pdo->prepare("SELECT COALESCE(MAX(branch_order_number), 0) + 1 FROM orders WHERE branch_id = ?");
+            $bnum_stmt->execute([$branch_id]);
+            $branch_order_num = $branch_id ? (int)$bnum_stmt->fetchColumn() : null;
+
+            $pdo->prepare("INSERT INTO orders (restaurant_id,branch_id,branch_order_number,table_number,customer_name,customer_notes,total_price,coupon_code,discount_amount,tax_amount,tax_details,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending')")
+                ->execute([$rid,$branch_id,$branch_order_num,$table,$customer,$notes,$grand_total,$coupon_code?:null,round($discount_amt,2),round($tax_amount,2),json_encode($tax_details)]);
             $order_id = $pdo->lastInsertId();
 
             // ===== كتابة order_items (validated prices فقط) =====

@@ -83,7 +83,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
 // جلب الطلبات — branch-scoped
 if($branch_id) {
     $orders_stmt = $pdo->prepare("
-        SELECT *, COALESCE(restaurant_order_number, id) as display_num
+        SELECT *, COALESCE(branch_order_number, restaurant_order_number, id) as display_num
         FROM orders
         WHERE restaurant_id=? AND branch_id=?
           AND status IN ('ready','preparing','confirmed','pending')
@@ -92,7 +92,7 @@ if($branch_id) {
     $orders_stmt->execute([$rid, $branch_id]);
 } else {
     $orders_stmt = $pdo->prepare("
-        SELECT *, COALESCE(restaurant_order_number, id) as display_num
+        SELECT *, COALESCE(branch_order_number, restaurant_order_number, id) as display_num
         FROM orders
         WHERE restaurant_id=? AND status IN ('ready','preparing','confirmed','pending')
         ORDER BY FIELD(status,'ready','confirmed','preparing','pending'), created_at ASC
