@@ -28,4 +28,65 @@ try {
     http_response_code(503);
     die('تعذّر الاتصال بقاعدة البيانات حالياً. حاول بعد قليل.');
 }
+
+// ===== CSRF helpers: auto-load =====
+// يضمن توفر csrf_field/csrf_token/csrf_require/csrf_meta لكل صفحة
+// بتحمّل database.php، بدون ما كل صفحة تعمل require يدوي.
+// file_exists() للحماية لو الملف ما اترفع للإنتاج بعد.
+$__csrf_path = __DIR__ . '/csrf.php';
+if (is_file($__csrf_path)) {
+    require_once $__csrf_path;
+}
+unset($__csrf_path);
+
+// ===== Fallback stubs =====
+// لو csrf.php مش موجود (مثلاً deploy ناقص)، نعرّف stubs بدل ما الصفحة تموت
+// بـ "Call to undefined function csrf_field()". الـ stubs مش آمنة
+// لكنها تمنع الـ 500 والصفحة تشتغل لحد ما يتم رفع الملف.
+if (!function_exists('csrf_token')) {
+    function csrf_token(): string {
+        if (session_status() === PHP_SESSION_NONE) { @session_start(); }
+        if (empty($_SESSION['_csrf_token'])) {
+            $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['_csrf_token'];
+    }
+}
+if (!function_exists('csrf_field')) {
+    function csrf_field(): string {
+        return '<input type="hidden" name="_csrf_token" value="'
+             . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+    }
+}
+if (!function_exists('csrf_meta')) {
+    function csrf_meta(): string {
+        return '<meta name="csrf-token" content="'
+             . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+    }
+}
+if (!function_exists('csrf_verify')) {
+    function csrf_verify(): bool {
+        $submitted = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if ($submitted === '' || empty($_SESSION['_csrf_token'])) return false;
+        return hash_equals($_SESSION['_csrf_token'], (string)$submitted);
+    }
+}
+if (!function_exists('csrf_require')) {
+    function csrf_require(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
+        if (csrf_verify()) return;
+        http_response_code(403);
+        $isAjax = !empty($_POST['ajax'])
+              || (isset($_SERVER['HTTP_X_REQUESTED_WITH'])
+                  && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success'=>false,'error'=>'csrf_invalid','message'=>'انتهت صلاحية جلستك.']);
+        } else {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'CSRF: انتهت صلاحية جلستك.';
+        }
+        exit;
+    }
+}
 ?>
