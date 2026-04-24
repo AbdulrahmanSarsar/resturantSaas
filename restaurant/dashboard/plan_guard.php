@@ -11,30 +11,34 @@
  */
 
 // ===== تعريف الميزات لكل باقة =====
-define('PLAN_FEATURES', [
-    'basic' => [
-        'menu',       // منيو + QR
-    ],
-    'advanced' => [
-        'menu',
-        'ar',         // عرض AR
-        'ratings',    // تقييمات
-        'stats',      // إحصائيات متقدمة
-    ],
-    'premium' => [
-        'menu',
-        'ar',
-        'ratings',
-        'stats',
-        'orders',     // نظام الطلبات
-        'coupons',    // كوبونات
-        'staff',      // أدوار الموظفين
-        'shamcash',   // شام كاش
-    ],
-]);
+if (!defined('PLAN_FEATURES')) {
+    define('PLAN_FEATURES', [
+        'basic' => [
+            'menu',       // منيو + QR
+        ],
+        'advanced' => [
+            'menu',
+            'ar',         // عرض AR
+            'ratings',    // تقييمات
+            'stats',      // إحصائيات متقدمة
+        ],
+        'premium' => [
+            'menu',
+            'ar',
+            'ratings',
+            'stats',
+            'orders',     // نظام الطلبات
+            'coupons',    // كوبونات
+            'staff',      // أدوار الموظفين
+            'shamcash',   // شام كاش
+        ],
+    ]);
+}
 
 // ترتيب الباقات
-define('PLAN_RANK', ['basic' => 1, 'advanced' => 2, 'premium' => 3]);
+if (!defined('PLAN_RANK')) {
+    define('PLAN_RANK', ['basic' => 1, 'advanced' => 2, 'premium' => 3]);
+}
 
 /**
  * تحقق إذا الباقة الحالية تدعم الميزة

@@ -196,7 +196,10 @@ class AuthMiddleware
                 $restName = $user['restaurant_name'] ?? $user['organization_name'] ?? $user['name'];
                 $_SESSION['restaurant_name'] = $restName;
                 
-                $_SESSION['restaurant_plan'] = $this->getActivePlan($user['organization_id']);
+                $_SESSION['restaurant_plan'] = $this->getActivePlan(
+                    $user['organization_id'] ?? null,
+                    $user['restaurant_id'] ?? null
+                );
                 break;
 
             case 'waiter':
@@ -220,26 +223,55 @@ class AuthMiddleware
     }
 
     /**
-     * Get the active subscription plan for an organization.
+     * Get the active subscription plan.
      *
      * بعد إهمال subscriptions_v2 — نقرأ من restaurants.subscription_plan مباشرة.
-     * (restaurant-level plans، organization-wide lookup يبقى أول مطعم نشط)
+     * Priority: (1) restaurant_id (direct), (2) organization_id (if column exists).
      */
-    private function getActivePlan(?int $orgId): string
+    private function getActivePlan(?int $orgId, ?int $restId = null): string
     {
-        if (!$orgId) return 'basic';
+        // الطريق المباشر: عبر restaurant_id (مضمون)
+        if ($restId) {
+            $stmt = $this->db->prepare("
+                SELECT subscription_plan AS plan
+                FROM restaurants
+                WHERE id = ?
+                  AND (subscription_expiry IS NULL OR subscription_expiry >= CURDATE())
+                LIMIT 1
+            ");
+            $stmt->execute([$restId]);
+            $sub = $stmt->fetch();
+            if ($sub && $sub['plan']) return $sub['plan'];
+        }
 
-        $stmt = $this->db->prepare("
-            SELECT subscription_plan AS plan
-            FROM restaurants
-            WHERE organization_id = ?
-              AND (subscription_expiry IS NULL OR subscription_expiry >= CURDATE())
-            ORDER BY subscription_expiry DESC LIMIT 1
-        ");
-        $stmt->execute([$orgId]);
-        $sub = $stmt->fetch();
+        // fallback عبر organization_id (لو restaurants عندها العمود)
+        if ($orgId && $this->restaurantsHasOrgColumn()) {
+            $stmt = $this->db->prepare("
+                SELECT subscription_plan AS plan
+                FROM restaurants
+                WHERE organization_id = ?
+                  AND (subscription_expiry IS NULL OR subscription_expiry >= CURDATE())
+                ORDER BY subscription_expiry DESC LIMIT 1
+            ");
+            $stmt->execute([$orgId]);
+            $sub = $stmt->fetch();
+            if ($sub && $sub['plan']) return $sub['plan'];
+        }
 
-        return ($sub && $sub['plan']) ? $sub['plan'] : 'basic';
+        return 'basic';
+    }
+
+    private function restaurantsHasOrgColumn(): ?bool
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+        try {
+            $chk = $this->db->query("SHOW COLUMNS FROM restaurants LIKE 'organization_id'");
+            $cached = $chk && $chk->rowCount() > 0;
+        } catch (\Throwable $e) {
+            $cached = false;
+        }
+        return $cached;
     }
 
     /**

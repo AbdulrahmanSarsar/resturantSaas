@@ -275,16 +275,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['items'])) {
                     ->execute([$coupon_code, $rid]);
             }
 
-
-
-        // ===== Redirect بعد النجاح — يحمل branch_slug =====
-        $redirect_branch = $post_branch ?: $branch_url;
-        if($redirect_branch) {
-            header("Location: " . BASE_URL . "/menu/{$slug}/{$redirect_branch}/order/{$order_id}");
-        } else {
-            header("Location: " . BASE_URL . "/menu/{$slug}/order/{$order_id}");
+            // ===== Redirect بعد النجاح — يحمل branch_slug =====
+            $redirect_branch = $post_branch ?: $branch_url;
+            if ($redirect_branch) {
+                header("Location: " . BASE_URL . "/menu/{$slug}/{$redirect_branch}/order/{$order_id}");
+            } else {
+                header("Location: " . BASE_URL . "/menu/{$slug}/order/{$order_id}");
+            }
+            exit;
         }
-        exit;
     }
 }
 
