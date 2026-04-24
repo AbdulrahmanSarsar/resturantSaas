@@ -9,6 +9,7 @@
  *   - الواجهة: بدون أي تغيير (1400+ سطر HTML/CSS/JS كما هي)
  */
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 require_once 'plan_guard.php';
 
 if(!isset($_SESSION['restaurant_id'])) {
@@ -29,6 +30,7 @@ $catService = service('category');
 $cats = $catService->getActiveForRestaurant($rid);
 
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_require();
 
     if($_POST['action'] === 'add') {
         $result = $dishService->create($rid, $_POST, $_FILES, $active_branch_id);
@@ -477,6 +479,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
         <div style="font-size:11px;color:var(--ink2);margin-top:2px;">راجع قائمة الأطباق وتحقق من التوفر اليومي</div>
     </div>
     <form method="POST" style="margin:0;">
+        <?= csrf_field() ?>
         <input type="hidden" name="action" value="reset_soldout">
         <button type="submit" style="padding:7px 14px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:9px;color:#F59E0B;font-size:12px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;">إعادة تفعيل الكل</button>
     </form>
@@ -556,6 +559,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
                 <?php endif; ?>
                 <div class="dish-actions">
                     <form method="POST" style="flex:1.2">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action"  value="toggle">
                         <input type="hidden" name="dish_id" value="<?= $d['id'] ?>">
                         <button type="submit" style="width:100%"
@@ -568,6 +572,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
                         </button>
                     </form>
                     <form method="POST">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action"  value="toggle_soldout">
                         <input type="hidden" name="dish_id" value="<?= $d['id'] ?>">
                         <button type="submit"
@@ -606,6 +611,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
             </button>
         </div>
         <form method="POST" enctype="multipart/form-data">
+            <?= csrf_field() ?>
             <input type="hidden" name="action"    id="formAction" value="add">
             <input type="hidden" name="dish_id"   id="dishId">
             <input type="hidden" name="old_image" id="oldImage">
@@ -890,6 +896,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
             هاد الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
+            <?= csrf_field() ?>
             <input type="hidden" name="action"  value="delete">
             <input type="hidden" name="dish_id" id="deleteDishId">
             <button type="button" class="btn btn-secondary" style="flex:1"
@@ -1299,7 +1306,11 @@ function saveOptions() {
         });
     });
 
-    fetch('', {method:'POST', body: fd})
+    fetch('', {
+        method: 'POST',
+        headers: {'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''},
+        body: fd
+    })
     .then(r => r.json())
     .then(d => {
         btn.classList.remove('saving');

@@ -9,6 +9,7 @@
  */
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
     header('Location: login.php'); exit;
@@ -93,6 +94,7 @@ if(isset($_GET['ajax']) && $_GET['ajax'] === 'poll') {
 
 // ===== POST handlers — بدون تغيير =====
 if($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_require();
     if(isset($_POST['order_id'])) {
         $allowed = ['confirmed','preparing','ready','cancelled'];
         $status  = $_POST['status'] ?? '';
@@ -107,8 +109,29 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         if(isset($_POST['ajax'])) { echo json_encode(['success'=>true]); exit; }
     }
     if(isset($_POST['dish_id']) && isset($_POST['sold_out_action'])) {
-        $pdo->prepare("UPDATE dishes SET sold_out=NOT sold_out WHERE id=? AND restaurant_id=?")
-            ->execute([$_POST['dish_id'], $rid]);
+        // نكتب على branch_dish_overrides (المصدر الحقيقي لـ sold_out)
+        // — ownership check: تأكد إن الطبق يخص المطعم
+        $did = (int)$_POST['dish_id'];
+        $chk = $pdo->prepare("SELECT 1 FROM dishes_v2 WHERE id=? AND restaurant_id=?");
+        $chk->execute([$did, $rid]);
+        if ($chk->fetch()) {
+            if ($branch_id) {
+                // UPSERT — toggle لهذا الفرع فقط
+                $pdo->prepare("
+                    INSERT INTO branch_dish_overrides (branch_id, dish_id, sold_out)
+                    VALUES (?, ?, 1)
+                    ON DUPLICATE KEY UPDATE sold_out = NOT sold_out
+                ")->execute([$branch_id, $did]);
+            } else {
+                // بلا فرع — نقلب على كل فروع هالمطعم
+                $pdo->prepare("
+                    UPDATE branch_dish_overrides bdo
+                    JOIN branches b ON b.id = bdo.branch_id
+                    SET bdo.sold_out = NOT bdo.sold_out
+                    WHERE bdo.dish_id = ? AND b.restaurant_id = ?
+                ")->execute([$did, $rid]);
+            }
+        }
         if(isset($_POST['ajax'])) { echo json_encode(['success'=>true]); exit; }
     }
 }
@@ -147,10 +170,23 @@ if(false) { // placeholder
     }
     $orders = $orders_stmt->fetchAll();
 
-    foreach($orders as &$o) {
-        $items = $pdo->prepare("SELECT dish_id, dish_name, quantity, notes, options FROM order_items WHERE order_id=?");
-        $items->execute([$o['id']]);
-        $o['items'] = $items->fetchAll();
+    // Batch-load order_items بدل N+1
+    $items_by_order = [];
+    if (!empty($orders)) {
+        $order_ids = array_column($orders, 'id');
+        $ph = implode(',', array_fill(0, count($order_ids), '?'));
+        $items_stmt = $pdo->prepare(
+            "SELECT order_id, dish_id, dish_name, quantity, notes, options
+             FROM order_items
+             WHERE order_id IN ($ph) ORDER BY id"
+        );
+        $items_stmt->execute($order_ids);
+        foreach ($items_stmt->fetchAll() as $row) {
+            $items_by_order[$row['order_id']][] = $row;
+        }
+    }
+    foreach ($orders as &$o) {
+        $o['items'] = $items_by_order[$o['id']] ?? [];
     }
     unset($o);
 
@@ -170,8 +206,30 @@ if(false) { // placeholder
 
 $last_id = intval($max_id_stmt->fetchColumn());
 
-$dishes = $pdo->prepare("SELECT id, name, sold_out FROM dishes WHERE restaurant_id=? AND is_available=1 ORDER BY sort_order, name");
-$dishes->execute([$rid]);
+// Dishes list — source is dishes_v2; sold_out يجي من branch_dish_overrides حسب الفرع
+if ($branch_id) {
+    $dishes = $pdo->prepare("
+        SELECT d.id, d.name, COALESCE(bdo.sold_out, 0) AS sold_out
+        FROM dishes_v2 d
+        LEFT JOIN branch_dish_overrides bdo
+               ON bdo.dish_id = d.id AND bdo.branch_id = ?
+        WHERE d.restaurant_id = ? AND d.is_active = 1
+          AND COALESCE(bdo.is_available, 1) = 1
+        ORDER BY d.sort_order, d.name
+    ");
+    $dishes->execute([$branch_id, $rid]);
+} else {
+    $dishes = $pdo->prepare("
+        SELECT d.id, d.name,
+               COALESCE(MAX(bdo.sold_out), 0) AS sold_out
+        FROM dishes_v2 d
+        LEFT JOIN branch_dish_overrides bdo ON bdo.dish_id = d.id
+        WHERE d.restaurant_id = ? AND d.is_active = 1
+        GROUP BY d.id, d.name, d.sort_order
+        ORDER BY d.sort_order, d.name
+    ");
+    $dishes->execute([$rid]);
+}
 $dishes = $dishes->fetchAll();
 
 $counts = ['pending'=>0,'confirmed'=>0,'preparing'=>0];
@@ -184,6 +242,7 @@ foreach($orders as $o) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<?= csrf_meta() ?>
 <title>مطبخ — <?= htmlspecialchars($_SESSION['staff_rest_name']) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -613,11 +672,14 @@ function updateElapsed(){
 updateElapsed();
 setInterval(updateElapsed,30000);
 
+// CSRF token (read once)
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
 // Status Update
 function updateStatus(orderId,status,btn){
     btn.disabled=true; btn.style.opacity='.5';
-    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`order_id=${orderId}&status=${status}&ajax=1`})
+    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-Token':CSRF_TOKEN},
+        body:`order_id=${orderId}&status=${status}&ajax=1&_csrf_token=${encodeURIComponent(CSRF_TOKEN)}`})
     .then(r=>r.json())
     .then(d=>{
         if(d.success){
@@ -639,8 +701,8 @@ function updateStatus(orderId,status,btn){
 // Sold Out
 function toggleSoldOut(dishId,btn){
     btn.disabled=true;
-    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`dish_id=${dishId}&sold_out_action=1&ajax=1`})
+    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-Token':CSRF_TOKEN},
+        body:`dish_id=${dishId}&sold_out_action=1&ajax=1&_csrf_token=${encodeURIComponent(CSRF_TOKEN)}`})
     .then(r=>r.json())
     .then(d=>{
         if(d.success){

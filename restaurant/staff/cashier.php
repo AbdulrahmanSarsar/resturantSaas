@@ -4,6 +4,7 @@
  */
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'cashier') {
     header('Location: login.php'); exit;
@@ -46,6 +47,7 @@ if(!function_exists('fmt_price')) {
 
 // AJAX: تسجيل قبض
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['ajax'])) {
+    csrf_require();
     $order_id = intval($_POST['order_id']);
     $method   = in_array($_POST['method'],['cash','card','shamcash']) ? $_POST['method'] : 'cash';
     $chk = $pdo->prepare("SELECT id FROM orders WHERE id=? AND restaurant_id=? AND status='delivered' AND payment_status='unpaid'");
@@ -91,9 +93,23 @@ if($branch_id) {
 }
 $unpaid_orders = $orders_stmt->fetchAll();
 
-// ===== إحصائيات اليوم =====
+// Batch-load order_items للعرض — بدل N+1 في الـ foreach
+$items_by_order = [];
+if (!empty($unpaid_orders)) {
+    $oid_list = array_column($unpaid_orders, 'id');
+    $ph = implode(',', array_fill(0, count($oid_list), '?'));
+    $bst = $pdo->prepare("SELECT order_id, dish_name, quantity FROM order_items WHERE order_id IN ($ph) ORDER BY id");
+    $bst->execute($oid_list);
+    foreach ($bst->fetchAll() as $row) {
+        $items_by_order[$row['order_id']][] = $row;
+    }
+}
+
+// ===== إحصائيات اليوم — branch-scoped =====
+$stats_branch_sql    = $branch_id ? "AND branch_id = ?" : "";
+$stats_branch_params = $branch_id ? [$branch_id]       : [];
 $today_stats = $pdo->prepare("
-    SELECT 
+    SELECT
         COUNT(*) as total_orders,
         COALESCE(SUM(total_price),0) as total_revenue,
         SUM(payment_method='cash') as cash_count,
@@ -103,9 +119,9 @@ $today_stats = $pdo->prepare("
         SUM(payment_method='shamcash') as sham_count,
         COALESCE(SUM(CASE WHEN payment_method='shamcash' THEN total_price END),0) as sham_revenue
     FROM orders
-    WHERE restaurant_id=? AND payment_status='paid' AND DATE(paid_at)=CURDATE()
+    WHERE restaurant_id=? $stats_branch_sql AND payment_status='paid' AND DATE(paid_at)=CURDATE()
 ");
-$today_stats->execute([$rid]);
+$today_stats->execute(array_merge([$rid], $stats_branch_params));
 $stats = $today_stats->fetch();
 ?>
 <!DOCTYPE html>
@@ -113,6 +129,7 @@ $stats = $today_stats->fetch();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= csrf_meta() ?>
 <title>الكاشير — <?= htmlspecialchars($restaurant['name']) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -255,11 +272,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
     <?php else: ?>
 
     <?php foreach($unpaid_orders as $i => $o): ?>
-    <?php
-        $items_stmt = $pdo->prepare("SELECT dish_name, quantity FROM order_items WHERE order_id=?");
-        $items_stmt->execute([$o['id']]);
-        $items = $items_stmt->fetchAll();
-    ?>
+    <?php $items = $items_by_order[$o['id']] ?? []; ?>
     <div class="order-card" id="oc-<?= $o['id'] ?>" style="animation-delay:<?= $i*.04 ?>s">
         <div class="order-head">
             <div class="order-num">#<?= $o['display_num'] ?></div>
@@ -321,10 +334,11 @@ function confirmPay(orderId) {
     cb.disabled = true;
     cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/></svg> جاري...';
 
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     fetch('', {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `ajax=1&order_id=${orderId}&method=${method}`
+        headers: {'Content-Type': 'application/x-www-form-urlencoded','X-CSRF-Token':csrf},
+        body: `ajax=1&order_id=${orderId}&method=${method}&_csrf_token=${encodeURIComponent(csrf)}`
     })
     .then(r => r.json())
     .then(data => {

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 $rid     = $_SESSION['restaurant_id'];
@@ -9,6 +10,7 @@ $error   = '';
 
 // ===== POST HANDLER =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_require();
 
     if($_POST['action'] === 'add' || $_POST['action'] === 'edit') {
         $name     = trim($_POST['name'] ?? '');
@@ -271,6 +273,7 @@ require_once 'sidebar.php';
                     تعديل
                 </button>
                 <form method="POST" style="flex:1;display:flex;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="toggle">
                     <input type="hidden" name="offer_id" value="<?= $offer['id'] ?>">
                     <button type="submit" class="oa-btn oa-toggle" style="flex:1;">
@@ -296,6 +299,7 @@ require_once 'sidebar.php';
             <button class="modal-close" onclick="closeOfferModal()">✕</button>
         </div>
         <form method="POST" enctype="multipart/form-data">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" id="offerAction" value="add">
             <input type="hidden" name="offer_id" id="offerId">
             <input type="hidden" name="old_image" id="offerOldImage">
@@ -387,6 +391,7 @@ require_once 'sidebar.php';
             رح تحذف عرض "<strong id="deleteOfferName" style="color:var(--ink)"></strong>". هاد الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="offer_id" id="deleteOfferId">
             <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('deleteOfferModal').classList.remove('open')">إلغاء</button>

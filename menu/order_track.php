@@ -9,37 +9,24 @@ $stmt->execute([$slug]);
 $restaurant = $stmt->fetch();
 if(!$restaurant) { http_response_code(404); die('غير موجود'); }
 
-
-// ===== العملة =====
-$cur_symbol    = $restaurant['currency_symbol']    ?? '$';
-$cur_symbol_en = $restaurant['currency_symbol_en'] ?? $restaurant['currency_symbol'] ?? '$';
-$cur_decimals  = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix    = in_array($cur_symbol, ['$', '\u20ac', '\u20ba']);
-$cur_prefix_en = in_array($cur_symbol_en, ['$', '\u20ac', '\u20ba']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $formatted = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
-    }
-}
-
-
 $stmt = $pdo->prepare("SELECT o.* FROM orders o WHERE o.id=? AND o.restaurant_id=?");
 $stmt->execute([$order_id, $restaurant['id']]);
 $order = $stmt->fetch();
 if(!$order) { http_response_code(404); die('الطلب غير موجود'); }
 $display_order_num = $order['restaurant_order_number'] ?? $order_id;
+
 // ===== العملة =====
-$cur_symbol   = $restaurant['currency_symbol']   ?? '$';
-$cur_decimals = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix   = in_array($cur_symbol, ['$', '€', '₺']);
+$cur_symbol    = $restaurant['currency_symbol']    ?? '$';
+$cur_symbol_en = $restaurant['currency_symbol_en'] ?? $restaurant['currency_symbol'] ?? '$';
+$cur_decimals  = intval($restaurant['currency_decimals'] ?? 2);
+$cur_prefix    = in_array($cur_symbol,    ['$', '€', '₺']);
+$cur_prefix_en = in_array($cur_symbol_en, ['$', '€', '₺']);
 if(!function_exists('fmt_price')) {
     function fmt_price($amount, $symbol, $decimals, $is_prefix) {
         $formatted = number_format(floatval($amount), $decimals);
         return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
     }
 }
-
 
 // ضرائب الطلب
 $order_taxes = [];
@@ -47,29 +34,15 @@ if(!empty($order['tax_details'])) {
     $order_taxes = json_decode($order['tax_details'], true) ?: [];
 }
 
-$items = $pdo->prepare("SELECT oi.*, COALESCE(oi.dish_name_en, d.name_en, '') as dish_name_en_resolved
+// ===== 1 query: أصناف هذا الطلب (مع name_en) =====
+$items_stmt = $pdo->prepare("SELECT oi.*, COALESCE(oi.dish_name_en, d.name_en, '') AS dish_name_en_resolved
     FROM order_items oi
-    LEFT JOIN dishes d ON d.id = oi.dish_id
+    LEFT JOIN dishes_v2 d ON d.id = oi.dish_id
     WHERE oi.order_id=? ORDER BY oi.id");
-$items->execute([$order_id]);
-$items = $items->fetchAll();
+$items_stmt->execute([$order_id]);
+$items = $items_stmt->fetchAll();
 
-// ===== حساب وقت التحضير المتوقع =====
-// 1. وقت هذا الطلب (أطول طبق + دقيقتين لكل وحدة إضافية)
-$max_prep = 0;
-$total_items_count = 0;
-foreach($items as $it) {
-    if(empty($it['dish_id'])) continue;
-    $dp = $pdo->prepare("SELECT COALESCE(prep_time,15) FROM dishes WHERE id=?");
-    $dp->execute([$it['dish_id']]);
-    $pt = intval($dp->fetchColumn() ?: 15);
-    if($pt > $max_prep) $max_prep = $pt;
-    $total_items_count += intval($it['quantity']);
-}
-$extra = min(($total_items_count - 1) * 2, 10);
-$this_order_time = $max_prep > 0 ? $max_prep + $extra : 15;
-
-// 2. الطلبات اللي قبله وهي لسا في الكيو
+// ===== 1 query: طلبات الكيو اللي قبله =====
 $queue_stmt = $pdo->prepare("
     SELECT o.id, o.created_at
     FROM orders o
@@ -78,22 +51,68 @@ $queue_stmt = $pdo->prepare("
       AND o.status IN ('pending','confirmed','preparing')
       AND o.created_at < ?
     ORDER BY o.created_at ASC
+    LIMIT 50
 ");
 $queue_stmt->execute([$restaurant['id'], $order_id, $order['created_at']]);
 $queue_orders = $queue_stmt->fetchAll();
 $queue_count  = count($queue_orders);
 
-// 3. حساب الوقت المتبقي للطلبات السابقة
+// ===== 1 query: كل أصناف طلبات الكيو دفعة وحدة (بدل N queries) =====
+$queue_items_by_order = [];
+if ($queue_count > 0) {
+    $queue_ids = array_column($queue_orders, 'id');
+    $ph_q = implode(',', array_fill(0, count($queue_ids), '?'));
+    $qi_stmt = $pdo->prepare("SELECT order_id, dish_id, quantity
+                              FROM order_items
+                              WHERE order_id IN ($ph_q) AND dish_id IS NOT NULL");
+    $qi_stmt->execute($queue_ids);
+    foreach ($qi_stmt->fetchAll() as $row) {
+        $queue_items_by_order[$row['order_id']][] = $row;
+    }
+}
+
+// ===== 1 query: prep_time لكل الأطباق المعنية دفعة وحدة (بدل N queries) =====
+$all_dish_ids = [];
+foreach ($items as $it) {
+    if (!empty($it['dish_id'])) $all_dish_ids[(int)$it['dish_id']] = true;
+}
+foreach ($queue_items_by_order as $qi_items) {
+    foreach ($qi_items as $qi) {
+        if (!empty($qi['dish_id'])) $all_dish_ids[(int)$qi['dish_id']] = true;
+    }
+}
+$prep_times = [];
+if (!empty($all_dish_ids)) {
+    $ids   = array_keys($all_dish_ids);
+    $ph_d  = implode(',', array_fill(0, count($ids), '?'));
+    $pt_st = $pdo->prepare("SELECT id, COALESCE(prep_time, 15) AS prep_time
+                            FROM dishes_v2 WHERE id IN ($ph_d)");
+    $pt_st->execute($ids);
+    foreach ($pt_st->fetchAll() as $row) {
+        $prep_times[(int)$row['id']] = (int)$row['prep_time'];
+    }
+}
+
+// ===== حساب وقت التحضير — in-memory =====
+// 1. وقت هذا الطلب (أطول طبق + دقيقتين لكل وحدة إضافية)
+$max_prep = 0;
+$total_items_count = 0;
+foreach($items as $it) {
+    if(empty($it['dish_id'])) continue;
+    $pt = $prep_times[(int)$it['dish_id']] ?? 15;
+    if($pt > $max_prep) $max_prep = $pt;
+    $total_items_count += intval($it['quantity']);
+}
+$extra = min(($total_items_count - 1) * 2, 10);
+$this_order_time = $max_prep > 0 ? $max_prep + $extra : 15;
+
+// 2. حساب الوقت المتبقي للطلبات السابقة
 $queue_wait = 0;
 foreach($queue_orders as $qo) {
-    $qi = $pdo->prepare("SELECT dish_id, quantity FROM order_items WHERE order_id=? AND dish_id IS NOT NULL");
-    $qi->execute([$qo['id']]);
-    $q_items = $qi->fetchAll();
+    $q_items = $queue_items_by_order[$qo['id']] ?? [];
     $q_max = 0; $q_count = 0;
     foreach($q_items as $qi_row) {
-        $qd = $pdo->prepare("SELECT COALESCE(prep_time,15) FROM dishes WHERE id=?");
-        $qd->execute([$qi_row['dish_id']]);
-        $qpt = intval($qd->fetchColumn() ?: 15);
+        $qpt = $prep_times[(int)$qi_row['dish_id']] ?? 15;
         if($qpt > $q_max) $q_max = $qpt;
         $q_count += intval($qi_row['quantity']);
     }

@@ -9,6 +9,7 @@
  *   - الواجهة: بدون أي تغيير
  */
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 
 if(!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
@@ -22,6 +23,7 @@ $error   = '';
 $catService = service('category');
 
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_require();
 
     if($_POST['action'] === 'add') {
         $name = trim($_POST['name'] ?? '');
@@ -273,6 +275,7 @@ require_once 'sidebar.php';
             تصنيف جديد
         </div>
         <form method="POST">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="add">
             <div class="add-form-row">
                 <div class="form-group" style="margin:0">
@@ -361,6 +364,7 @@ require_once 'sidebar.php';
             <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('open')">✕</button>
         </div>
         <form method="POST">
+            <?= csrf_field() ?>
             <input type="hidden" name="action"   value="edit">
             <input type="hidden" name="cat_id"   id="editCatId">
             <input type="hidden" name="is_active" id="isActiveInput" value="1">
@@ -411,6 +415,7 @@ require_once 'sidebar.php';
             الأطباق المرتبطة بهاد التصنيف رح تبقى بس بدون تصنيف.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="cat_id" id="deleteCatId">
             <button type="button" class="btn btn-secondary" style="flex:1"

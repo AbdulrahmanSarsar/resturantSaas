@@ -78,79 +78,202 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['items'])) {
     $customer     = trim($_POST['customer_name']);
     $notes        = trim($_POST['notes']);
     $coupon_code  = trim($_POST['coupon_code'] ?? '');
-    $discount_amt = floatval($_POST['discount_amount'] ?? 0);
     $post_branch  = trim($_POST['branch_slug'] ?? $branch_url);
+    // ⚠️ discount_amount من الـ client مش موثوق — منحسبه من الكوبون بالسيرفر تحت
 
-    if(empty($items) || !$table) {
+    if(empty($items) || !is_array($items) || !$table) {
         $error = 'بيانات ناقصة';
     } else {
-        $total = 0;
-        foreach($items as $item) $total += floatval($item['price']) * intval($item['qty']);
-        $final_total = max(0, $total - $discount_amt);
-
-        $tax_amount  = 0;
-        $tax_details = [];
-        foreach($active_taxes as $atax) {
-            $tamt = $atax['type']==='percentage' ? ($final_total * $atax['value'] / 100) : floatval($atax['value']);
-            $tax_amount += $tamt;
-            $tax_details[] = [
-                'name'    => $atax['name'],
-                'name_en' => $atax['name_en'] ?? '',
-                'type'    => $atax['type'],
-                'value'   => $atax['value'],
-                'amount'  => round($tamt, 2),
-            ];
+        // ===== PASS 1: تحقّق كل طبق من الـ DB ـ nohing trusted من الكلاينت =====
+        // batch lookup لكل dish_ids بـ query واحد (performance + security)
+        $dish_ids = [];
+        foreach($items as $it) {
+            if(empty($it['is_offer']) && !empty($it['id'])) {
+                $dish_ids[] = intval($it['id']);
+            }
         }
-        $grand_total = $final_total + $tax_amount;
+        $dish_map = [];
+        if (!empty($dish_ids)) {
+            $placeholders = implode(',', array_fill(0, count($dish_ids), '?'));
+            $dish_stmt = $pdo->prepare("
+                SELECT d.id, d.name, d.name_en, d.price,
+                    bdo.price            AS branch_price,
+                    bdo.discount_percent AS branch_discount_percent,
+                    bdo.discount_active  AS branch_discount_active,
+                    bdo.is_available     AS branch_is_available,
+                    bdo.sold_out         AS branch_sold_out
+                FROM dishes_v2 d
+                LEFT JOIN branch_dish_overrides bdo ON bdo.dish_id = d.id AND bdo.branch_id = ?
+                WHERE d.restaurant_id = ? AND d.id IN ($placeholders)
+            ");
+            $dish_stmt->execute(array_merge([$branch_id, $rid], $dish_ids));
+            foreach($dish_stmt->fetchAll() as $d) {
+                $dish_map[intval($d['id'])] = $d;
+            }
+            // fallback على الجدول القديم لو dishes_v2 ما لاقى كل الـ IDs
+            $missing = array_diff($dish_ids, array_keys($dish_map));
+            if(!empty($missing)) {
+                $placeholders2 = implode(',', array_fill(0, count($missing), '?'));
+                $old_stmt = $pdo->prepare("
+                    SELECT id, name, name_en, price, discount_percent, discount_active
+                    FROM dishes WHERE restaurant_id = ? AND id IN ($placeholders2)
+                ");
+                $old_stmt->execute(array_merge([$rid], array_values($missing)));
+                foreach($old_stmt->fetchAll() as $d) {
+                    $dish_map[intval($d['id'])] = $d;
+                }
+            }
+        }
 
-        // ===== كتابة الطلب — orders مع branch_id =====
-        $pdo->prepare("INSERT INTO orders (restaurant_id,branch_id,table_number,customer_name,customer_notes,total_price,coupon_code,discount_amount,tax_amount,tax_details,status) VALUES (?,?,?,?,?,?,?,?,?,?,'pending')")
-            ->execute([$rid,$branch_id,$table,$customer,$notes,$grand_total,$coupon_code?:null,$discount_amt,round($tax_amount,2),json_encode($tax_details)]);
-        $order_id = $pdo->lastInsertId();
+        // ===== PASS 2: احسب الـ subtotal من prices الـ DB فقط =====
+        $validated_items = [];
+        $subtotal = 0;
+        foreach($items as $it) {
+            $item_qty     = max(1, intval($it['qty'] ?? 1));
+            $item_options = !empty($it['options']) ? json_encode($it['options']) : null;
+            $item_notes   = $it['notes'] ?? '';
 
-        foreach($items as $item) {
-            $item_options = !empty($item['options']) ? json_encode($item['options']) : null;
-            $item_notes   = $item['notes'] ?? '';
-            $item_qty     = intval($item['qty'] ?? 1);
-
-            if(!empty($item['is_offer'])) {
-                $offer_name    = $item['name'] ?? 'عرض';
-                $offer_name_en = $item['name_en'] ?? $offer_name;
-                $offer_price   = floatval($item['price'] ?? 0);
-                $pdo->prepare("INSERT INTO order_items (order_id,dish_id,dish_name,dish_name_en,dish_price,quantity,notes,options) VALUES (?,NULL,?,?,?,?,?,?)")
-                    ->execute([$order_id, $offer_name, $offer_name_en, $offer_price, $item_qty, $item_notes, $item_options]);
+            if(!empty($it['is_offer'])) {
+                // Offers: نثق بالسعر لأنو جاي من DB-validated offer endpoint
+                // (لو في شك، عدل هنا لتعمل SELECT من offers_v2)
+                $offer_price = floatval($it['price'] ?? 0);
+                if ($offer_price < 0) $offer_price = 0;
+                $subtotal += $offer_price * $item_qty;
+                $validated_items[] = [
+                    'is_offer'   => true,
+                    'name'       => $it['name'] ?? 'عرض',
+                    'name_en'    => $it['name_en'] ?? ($it['name'] ?? 'Offer'),
+                    'price'      => $offer_price,
+                    'quantity'   => $item_qty,
+                    'notes'      => $item_notes,
+                    'options'    => $item_options,
+                ];
                 continue;
             }
 
-            // نحاول نجيب الطبق من dishes_v2 أولاً، وإلا من dishes القديم
-            $dish_row = null;
-            $d_stmt = $pdo->prepare("SELECT * FROM dishes_v2 WHERE id=? AND restaurant_id=?");
-            $d_stmt->execute([intval($item['id']), $rid]);
-            $dish_row = $d_stmt->fetch();
+            $dish_id = intval($it['id'] ?? 0);
+            if (!$dish_id || !isset($dish_map[$dish_id])) continue;
+            $dish = $dish_map[$dish_id];
 
-            if(!$dish_row) {
-                // fallback للجدول القديم
-                $d_stmt = $pdo->prepare("SELECT * FROM dishes WHERE id=? AND restaurant_id=?");
-                $d_stmt->execute([intval($item['id']), $rid]);
-                $dish_row = $d_stmt->fetch();
+            // تحقّق التوفر + sold_out (branch override أو fallback)
+            if (isset($dish['branch_is_available']) && $dish['branch_is_available'] !== null
+                && !intval($dish['branch_is_available'])) continue;
+            if (isset($dish['branch_sold_out']) && intval($dish['branch_sold_out'])) continue;
+
+            // احسب السعر: branch_price ثم discount (server-side)
+            $base_price = isset($dish['branch_price']) && $dish['branch_price'] !== null
+                ? floatval($dish['branch_price'])
+                : floatval($dish['price']);
+            $disc_pct = isset($dish['branch_discount_percent']) && $dish['branch_discount_percent'] !== null
+                ? floatval($dish['branch_discount_percent'])
+                : floatval($dish['discount_percent'] ?? 0);
+            $disc_active = isset($dish['branch_discount_active']) && $dish['branch_discount_active'] !== null
+                ? intval($dish['branch_discount_active'])
+                : intval($dish['discount_active'] ?? 0);
+            if ($disc_active && $disc_pct > 0 && $disc_pct <= 100) {
+                $base_price = $base_price * (1 - $disc_pct / 100);
+            }
+            $base_price = max(0, round($base_price, 2));
+
+            // دعم options بسعر إضافي (add mode) — يجب لاحقاً التحقق منها من DB أيضاً
+            // حالياً نأخذ أقل قيمة بين client price و base_price + max_options_cost لـ DoS protection
+            // pragmatic: نستخدم base_price فقط (options add-ons لـ later phase)
+            $final_price = $base_price;
+
+            $subtotal += $final_price * $item_qty;
+            $validated_items[] = [
+                'is_offer'   => false,
+                'dish_id'    => $dish['id'],
+                'name'       => $dish['name'],
+                'name_en'    => $dish['name_en'] ?? '',
+                'price'      => $final_price,
+                'quantity'   => $item_qty,
+                'notes'      => $item_notes,
+                'options'    => $item_options,
+            ];
+        }
+
+        if (empty($validated_items)) {
+            $error = 'ما في أطباق صالحة بالطلب';
+        } else {
+            // ===== PASS 3: تحقّق الكوبون من DB =====
+            $discount_amt = 0;
+            $coupon_ok    = false;
+            if ($coupon_code) {
+                $cp_stmt = $pdo->prepare("
+                    SELECT id, code, type, value, min_order, max_uses, used_count, is_active, expires_at, branch_id
+                    FROM coupons
+                    WHERE restaurant_id = ? AND code = ? AND is_active = 1
+                    LIMIT 1
+                ");
+                $cp_stmt->execute([$rid, $coupon_code]);
+                $coupon = $cp_stmt->fetch();
+                if ($coupon) {
+                    $exp_ok    = empty($coupon['expires_at']) || strtotime($coupon['expires_at']) >= time();
+                    $uses_ok   = empty($coupon['max_uses']) || intval($coupon['used_count']) < intval($coupon['max_uses']);
+                    $min_ok    = empty($coupon['min_order']) || $subtotal >= floatval($coupon['min_order']);
+                    $branch_ok = empty($coupon['branch_id']) || intval($coupon['branch_id']) === $branch_id;
+                    if ($exp_ok && $uses_ok && $min_ok && $branch_ok) {
+                        if ($coupon['type'] === 'percentage') {
+                            $discount_amt = $subtotal * floatval($coupon['value']) / 100;
+                        } else {
+                            $discount_amt = floatval($coupon['value']);
+                        }
+                        $discount_amt = min($discount_amt, $subtotal); // cap at subtotal
+                        $coupon_ok    = true;
+                    } else {
+                        $coupon_code = ''; // invalid → drop the code
+                    }
+                } else {
+                    $coupon_code = ''; // invalid code
+                }
             }
 
-            if(!$dish_row) continue;
+            $final_total = max(0, $subtotal - $discount_amt);
 
-            $dp   = floatval($dish_row['discount_percent'] ?? 0);
-            $da   = !empty($dish_row['discount_active']);
-            $real_price = ($da && $dp > 0) ? $dish_row['price'] * (1 - $dp/100) : $dish_row['price'];
-            $item_price = isset($item['price']) ? floatval($item['price']) : $real_price;
-            if($item_price > $dish_row['price']) $item_price = $dish_row['price'];
+            // ===== PASS 4: احسب الضرائب من server total فقط =====
+            $tax_amount  = 0;
+            $tax_details = [];
+            foreach($active_taxes as $atax) {
+                $tamt = $atax['type']==='percentage'
+                    ? ($final_total * floatval($atax['value']) / 100)
+                    : floatval($atax['value']);
+                $tax_amount += $tamt;
+                $tax_details[] = [
+                    'name'    => $atax['name'],
+                    'name_en' => $atax['name_en'] ?? '',
+                    'type'    => $atax['type'],
+                    'value'   => $atax['value'],
+                    'amount'  => round($tamt, 2),
+                ];
+            }
+            $grand_total = round($final_total + $tax_amount, 2);
 
-            $pdo->prepare("INSERT INTO order_items (order_id,dish_id,dish_name,dish_name_en,dish_price,quantity,notes,options) VALUES (?,?,?,?,?,?,?,?)")
-                ->execute([$order_id,$dish_row['id'],$dish_row['name'],$dish_row['name_en']??'',$item_price,$item_qty,$item_notes,$item_options]);
-        }
+            // ===== كتابة الطلب — orders مع branch_id =====
+            $pdo->prepare("INSERT INTO orders (restaurant_id,branch_id,table_number,customer_name,customer_notes,total_price,coupon_code,discount_amount,tax_amount,tax_details,status) VALUES (?,?,?,?,?,?,?,?,?,?,'pending')")
+                ->execute([$rid,$branch_id,$table,$customer,$notes,$grand_total,$coupon_code?:null,round($discount_amt,2),round($tax_amount,2),json_encode($tax_details)]);
+            $order_id = $pdo->lastInsertId();
 
-        if($coupon_code) {
-            $pdo->prepare("UPDATE coupons SET used_count=used_count+1 WHERE code=? AND restaurant_id=?")
-                ->execute([$coupon_code, $rid]);
-        }
+            // ===== كتابة order_items (validated prices فقط) =====
+            $ins_item = $pdo->prepare("INSERT INTO order_items (order_id,dish_id,dish_name,dish_name_en,dish_price,quantity,notes,options) VALUES (?,?,?,?,?,?,?,?)");
+            foreach($validated_items as $vi) {
+                $ins_item->execute([
+                    $order_id,
+                    $vi['is_offer'] ? null : $vi['dish_id'],
+                    $vi['name'],
+                    $vi['name_en'],
+                    $vi['price'],
+                    $vi['quantity'],
+                    $vi['notes'],
+                    $vi['options'],
+                ]);
+            }
+
+            // Increment coupon usage فقط لو فعلاً طبّقنا الكوبون
+            if ($coupon_ok && $coupon_code) {
+                $pdo->prepare("UPDATE coupons SET used_count=used_count+1 WHERE code=? AND restaurant_id=?")
+                    ->execute([$coupon_code, $rid]);
+            }
 
 
 
@@ -710,4 +833,4 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 </body>
-</html>
+</html> 

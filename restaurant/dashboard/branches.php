@@ -11,6 +11,7 @@
  *   - تبديل الفرع النشط بالـ session (POST action=switch)
  */
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 // plan_guard.php بيتحمّل تلقائياً من sidebar.php
 
 if (!isset($_SESSION['restaurant_id'])) {
@@ -24,6 +25,7 @@ $slug = $slug_stmt->fetchColumn();
 
 // ===== POST HANDLER =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_require();
     $action = $_POST['action'] ?? '';
 
     // --- تبديل الفرع النشط ---
@@ -490,6 +492,7 @@ require_once __DIR__ . '/sidebar.php';
                 </button>
                 <?php else: ?>
                 <form method="POST" style="display:inline">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="switch">
                     <input type="hidden" name="branch_id" value="<?= $b['id'] ?>">
                     <button class="btn-switch" type="submit">تعيين كالنشط</button>
@@ -521,6 +524,7 @@ require_once __DIR__ . '/sidebar.php';
 
                 <!-- Toggle -->
                 <form method="POST" style="display:inline" onsubmit="return confirm('<?= $b['is_active'] ? 'تعطيل هذا الفرع؟' : 'تفعيل هذا الفرع؟' ?>')">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="toggle">
                     <input type="hidden" name="branch_id" value="<?= $b['id'] ?>">
                     <button class="btn-toggle" type="submit"><?= $b['is_active'] ? 'تعطيل' : 'تفعيل' ?></button>
@@ -529,6 +533,7 @@ require_once __DIR__ . '/sidebar.php';
                 <!-- Delete -->
                 <?php if(count($branches) > 1): ?>
                 <form method="POST" style="display:inline" onsubmit="return confirm('حذف هذا الفرع نهائياً؟')">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="branch_id" value="<?= $b['id'] ?>">
                     <button class="btn-delete" type="submit">
@@ -562,6 +567,7 @@ require_once __DIR__ . '/sidebar.php';
             </button>
         </div>
         <form method="POST">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="add">
             <div class="modal-section-title">المعلومات الأساسية</div>
             <div class="form-row-2">
@@ -611,6 +617,7 @@ require_once __DIR__ . '/sidebar.php';
             </button>
         </div>
         <form method="POST">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="edit">
             <input type="hidden" name="branch_id" id="editBranchId">
             <div class="modal-section-title">المعلومات الأساسية</div>

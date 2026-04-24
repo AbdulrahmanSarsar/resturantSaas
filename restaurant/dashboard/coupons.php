@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
@@ -42,6 +43,7 @@ $validate_branch = function($branch_id) use ($pdo, $rid) {
 
 // Add coupon
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_require();
 
     if($_POST['action'] === 'add') {
         $code           = strtoupper(trim($_POST['code']));
@@ -450,6 +452,7 @@ require_once 'sidebar.php';
         </div>
         <div class="add-card-body">
             <form method="POST">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="add">
                 <div class="add-grid">
                     <div class="form-group">
@@ -590,6 +593,7 @@ require_once 'sidebar.php';
                 <!-- Actions -->
                 <div class="coup-actions">
                     <form method="POST" style="flex:1">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="toggle">
                         <input type="hidden" name="coupon_id" value="<?= $c['id'] ?>">
                         <button type="submit" class="coup-toggle-btn <?= $is_active ? 'is-active' : '' ?>" style="width:100%">
@@ -603,6 +607,7 @@ require_once 'sidebar.php';
                         </button>
                     </form>
                     <form method="POST" onsubmit="return confirm('حذف هذا الكوبون؟')">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="coupon_id" value="<?= $c['id'] ?>">
                         <button type="submit" class="coup-delete-btn">

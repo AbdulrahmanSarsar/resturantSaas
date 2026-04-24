@@ -13,6 +13,11 @@ if (!function_exists('plan_has_feature')) {
     require_once __DIR__ . '/plan_guard.php';
 }
 
+// CSRF helpers متوفرة لكل الصفحات اللي بتحمّل sidebar
+if (!function_exists('csrf_token')) {
+    require_once __DIR__ . '/../../config/csrf.php';
+}
+
 $restaurant_data = $pdo->prepare("SELECT * FROM restaurants WHERE id = ?");
 $restaurant_data->execute([$rid]);
 $restaurant_data = $restaurant_data->fetch();
@@ -114,6 +119,7 @@ $icons_svg = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?= csrf_meta() ?>
     <title>لوحة التحكم — <?= htmlspecialchars($restaurant_data['name']) ?></title>
     <script>(function(){var t=localStorage.getItem('dash_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">

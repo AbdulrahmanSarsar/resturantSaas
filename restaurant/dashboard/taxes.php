@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 $rid     = $_SESSION['restaurant_id'];
 $success = '';
@@ -41,6 +42,7 @@ $tax_belongs_to_restaurant = function($tax_id) use ($pdo, $rid) {
 
 // ===== POST HANDLER =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_require();
 
     if($_POST['action'] === 'add') {
         $branch_id = $validate_branch(intval($_POST['branch_id'] ?? ($active_branch_id ?? 0)));
@@ -265,6 +267,7 @@ require_once 'sidebar.php';
         ضريبة / رسم جديد
     </div>
     <form method="POST">
+        <?= csrf_field() ?>
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="type" id="addTypeVal" value="percentage">
         <div class="form-row-2">
@@ -372,6 +375,7 @@ require_once 'sidebar.php';
                 تعديل
             </button>
             <form method="POST" style="flex:1;display:flex;">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="toggle">
                 <input type="hidden" name="tax_id" value="<?= $tax['id'] ?>">
                 <button type="submit" class="ta-btn ta-toggle" style="flex:1;">
@@ -398,6 +402,7 @@ require_once 'sidebar.php';
             <button class="modal-close" onclick="document.getElementById('editTaxModal').classList.remove('open')">✕</button>
         </div>
         <form method="POST">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="edit">
             <input type="hidden" name="tax_id" id="editTaxId">
             <input type="hidden" name="type" id="editTypeVal" value="percentage">
@@ -453,6 +458,7 @@ require_once 'sidebar.php';
             رح تحذف ضريبة "<strong id="deleteTaxName" style="color:var(--ink)"></strong>". هاد الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="tax_id" id="deleteTaxId">
             <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('deleteTaxModal').classList.remove('open')">إلغاء</button>

@@ -9,6 +9,7 @@
  *   - روابط التواصل الاجتماعي
  */
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 require_once 'plan_guard.php';
 
 if(!isset($_SESSION['restaurant_id'])) {
@@ -70,7 +71,8 @@ $error   = '';
 
 // ===== حفظ الإعدادات =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    
+    csrf_require();
+
     if($_POST['action'] === 'save_currency') {
         $pdo->prepare("
             UPDATE branch_settings SET
@@ -227,6 +229,7 @@ require_once 'sidebar.php';
 
         <!-- ===== العملة ===== -->
         <form method="POST" class="fc">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_currency">
             <div class="fc-head">
                 <div class="fc-head-icon" style="background:rgba(245,158,11,.12);color:#F59E0B">
@@ -276,6 +279,7 @@ require_once 'sidebar.php';
 
         <!-- ===== طرق الدفع ===== -->
         <form method="POST" class="fc">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_payment">
             <div class="fc-head">
                 <div class="fc-head-icon" style="background:rgba(59,130,246,.12);color:#3B82F6">
@@ -313,6 +317,7 @@ require_once 'sidebar.php';
 
         <!-- ===== الإشعارات ===== -->
         <form method="POST" class="fc">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_notifications">
             <div class="fc-head">
                 <div class="fc-head-icon" style="background:rgba(34,197,94,.12);color:#22C55E">
@@ -360,6 +365,7 @@ require_once 'sidebar.php';
 
         <!-- ===== روابط التواصل ===== -->
         <form method="POST" class="fc">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_social">
             <div class="fc-head">
                 <div class="fc-head-icon" style="background:rgba(139,92,246,.12);color:#8B5CF6">

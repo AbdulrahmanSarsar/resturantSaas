@@ -4,6 +4,7 @@
  */
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'waiter') {
     header('Location: login.php'); exit;
@@ -67,6 +68,7 @@ if(isset($_GET['ajax']) && $_GET['ajax'] === 'poll') {
 
 // POST — تسليم
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
+    csrf_require();
     if(($_POST['status'] ?? '') === 'delivered') {
         $pdo->prepare("UPDATE orders SET status='delivered', staff_id=?, updated_at=NOW() WHERE id=? AND restaurant_id=?")
             ->execute([$staff_id, $_POST['order_id'], $rid]);
@@ -88,47 +90,36 @@ if($branch_id) {
         ORDER BY FIELD(status,'ready','confirmed','preparing','pending'), created_at ASC
     ");
     $orders_stmt->execute([$rid, $branch_id]);
-    $orders = $orders_stmt->fetchAll();
-    foreach($orders as &$o) {
-        $items = $pdo->prepare("SELECT dish_name, quantity FROM order_items WHERE order_id=?");
-        $items->execute([$o['id']]);
-        $o['items'] = $items->fetchAll();
-    }
-    unset($o);
 } else {
-    try {
-        if($branch_id) {
-            $orders_stmt = $pdo->prepare("
-                SELECT o.* FROM orders o
-                WHERE o.restaurant_id=? AND o.branch_id=?
-                  AND o.status IN ('ready','preparing','confirmed','pending')
-                ORDER BY FIELD(o.status,'ready','confirmed','preparing','pending'), o.created_at ASC
-            ");
-            $orders_stmt->execute([$rid, $branch_id]);
-        } else {
-            $orders_stmt = $pdo->prepare("
-                SELECT o.* FROM orders o
-                WHERE o.restaurant_id=? AND o.status IN ('ready','preparing','confirmed','pending')
-                ORDER BY FIELD(o.status,'ready','confirmed','preparing','pending'), o.created_at ASC
-            ");
-            $orders_stmt->execute([$rid]);
-        }
-    } catch(\Exception $e) {
-        $orders_stmt = $pdo->prepare("
-            SELECT o.* FROM orders o
-            WHERE o.restaurant_id=? AND o.status IN ('ready','preparing','confirmed','pending')
-            ORDER BY FIELD(o.status,'ready','confirmed','preparing','pending'), o.created_at ASC
-        ");
-        $orders_stmt->execute([$rid]);
-    }
-    $orders = $orders_stmt->fetchAll();
-    foreach($orders as &$o) {
-        $items = $pdo->prepare("SELECT dish_name, quantity FROM order_items WHERE order_id=?");
-        $items->execute([$o['id']]);
-        $o['items'] = $items->fetchAll();
-    }
-    unset($o);
+    $orders_stmt = $pdo->prepare("
+        SELECT *, COALESCE(restaurant_order_number, id) as display_num
+        FROM orders
+        WHERE restaurant_id=? AND status IN ('ready','preparing','confirmed','pending')
+        ORDER BY FIELD(status,'ready','confirmed','preparing','pending'), created_at ASC
+    ");
+    $orders_stmt->execute([$rid]);
 }
+$orders = $orders_stmt->fetchAll();
+
+// Batch-load order_items بدل N+1
+$items_by_order = [];
+if (!empty($orders)) {
+    $order_ids = array_column($orders, 'id');
+    $ph = implode(',', array_fill(0, count($order_ids), '?'));
+    $items_stmt = $pdo->prepare(
+        "SELECT order_id, dish_name, quantity
+         FROM order_items
+         WHERE order_id IN ($ph) ORDER BY id"
+    );
+    $items_stmt->execute($order_ids);
+    foreach ($items_stmt->fetchAll() as $row) {
+        $items_by_order[$row['order_id']][] = $row;
+    }
+}
+foreach ($orders as &$o) {
+    $o['items'] = $items_by_order[$o['id']] ?? [];
+}
+unset($o);
 
 $ready_count   = array_sum(array_map(fn($o)=>$o['status']==='ready'?1:0, $orders));
 $last_new_id   = !empty($orders) ? max(array_column($orders,'id')) : 0;
@@ -140,6 +131,7 @@ $last_ready_id = !empty($last_ready) ? max(array_column(array_values($last_ready
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<?= csrf_meta() ?>
 <title>نادل — <?= htmlspecialchars($_SESSION['staff_rest_name']) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -449,11 +441,14 @@ function sendNotif(title,body){
     try{ const n=new Notification(title,{body,tag:'waiter-ready',renotify:true,requireInteraction:true}); n.onclick=()=>{window.focus();n.close();}; }catch(e){}
 }
 
+// CSRF token (read once)
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
 // ===== Deliver =====
 function markDelivered(orderId, btn){
     btn.disabled=true; btn.innerHTML='...';
-    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`order_id=${orderId}&status=delivered&ajax=1`})
+    fetch('',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-Token':CSRF_TOKEN},
+        body:`order_id=${orderId}&status=delivered&ajax=1&_csrf_token=${encodeURIComponent(CSRF_TOKEN)}`})
     .then(r=>r.json())
     .then(d=>{
         if(d.success){

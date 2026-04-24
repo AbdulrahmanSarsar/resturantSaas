@@ -36,6 +36,7 @@ $ratings = $pdo->prepare("
     LEFT JOIN dishes_v2 d ON d.id = r.favorite_dish_id
     $where
     ORDER BY r.created_at DESC
+    LIMIT 500
 ");
 $ratings->execute($params);
 $ratings = $ratings->fetchAll();

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 plan_required('premium');
@@ -24,11 +25,18 @@ $active_branch_id = $_SESSION['active_branch_id'] ?? null;
 
 // POST: تحديث حالة الطلب
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
+    csrf_require();
+    // whitelist الحالات المسموحة — نمنع قيم غير متوقعة
+    $new_status = $_POST['status'] ?? '';
+    if (!in_array($new_status, ['pending','confirmed','preparing','ready','delivered','cancelled'], true)) {
+        if(isset($_POST['ajax'])) { echo json_encode(['success'=>false,'error'=>'bad_status']); exit; }
+        http_response_code(400); exit;
+    }
     $pdo->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=? AND restaurant_id=?")
-        ->execute([$_POST['status'], $_POST['order_id'], $rid]);
+        ->execute([$new_status, (int)$_POST['order_id'], $rid]);
     try {
         $pdo->prepare("INSERT INTO order_status_log (order_id,status,changed_at) VALUES (?,?,NOW())")
-            ->execute([$_POST['order_id'], $_POST['status']]);
+            ->execute([(int)$_POST['order_id'], $new_status]);
     } catch(Exception $e) {}
     if(isset($_POST['ajax'])) { echo json_encode(['success'=>true]); exit; }
 }
@@ -43,9 +51,22 @@ if($active_branch_id) { $where .= ' AND branch_id = ?'; $params[] = $active_bran
 if($date_mode !== 'all') { $where .= ' AND DATE(created_at) = CURDATE()'; }
 if($filter !== 'all')    { $where .= ' AND status = ?'; $params[] = $filter; }
 
-$orders = $pdo->prepare("SELECT * FROM orders $where ORDER BY created_at DESC");
+// LIMIT للحماية من تحميل آلاف الطلبات على صفحة واحدة — ما في pagination بعد
+$orders = $pdo->prepare("SELECT * FROM orders $where ORDER BY created_at DESC LIMIT 300");
 $orders->execute($params);
 $orders = $orders->fetchAll();
+
+// Batch-load order_items لكل الطلبات المعروضة — بدل N+1
+$items_by_order = [];
+if (!empty($orders)) {
+    $oid_list = array_column($orders, 'id');
+    $ph = implode(',', array_fill(0, count($oid_list), '?'));
+    $bst = $pdo->prepare("SELECT * FROM order_items WHERE order_id IN ($ph) ORDER BY id");
+    $bst->execute($oid_list);
+    foreach ($bst->fetchAll() as $row) {
+        $items_by_order[$row['order_id']][] = $row;
+    }
+}
 
 // إحصائيات — مع branch filter
 $stats_where  = 'WHERE restaurant_id=?';
@@ -257,9 +278,7 @@ require_once 'sidebar.php';
     $status_icons  = ['pending'=>'⏳','confirmed'=>'✓','preparing'=>'⚡','ready'=>'🍽️','delivered'=>'✅','cancelled'=>'❌'];
 
     foreach($orders as $idx => $o):
-        $items_stmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id=?");
-        $items_stmt->execute([$o['id']]);
-        $items = $items_stmt->fetchAll();
+        $items = $items_by_order[$o['id']] ?? [];
         $order_taxes = [];
         if(!empty($o['tax_details'])) {
             $order_taxes = json_decode($o['tax_details'], true) ?: [];
@@ -356,7 +375,10 @@ function updateStatus(orderId, status, btn) {
 
     fetch('', {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
         body: `order_id=${orderId}&status=${status}&ajax=1`
     })
     .then(r => r.json())

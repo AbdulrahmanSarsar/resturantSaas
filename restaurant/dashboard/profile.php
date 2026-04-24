@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 
 if(!isset($_SESSION['restaurant_id'])) {
@@ -16,6 +17,7 @@ $success = '';
 $error   = '';
 
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
+    csrf_require();
     $name            = trim($_POST['name']            ?? '');
     $phone           = trim($_POST['phone']           ?? '');
     $address         = trim($_POST['address']         ?? '');
@@ -105,6 +107,7 @@ if(plan_has_feature('staff')) {
 }
 
 if(plan_has_feature('staff') && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['staff_action'])) {
+    csrf_require();
     // تحقق إن الفرع تابع فعلاً لهذا المطعم (منع tampering)
     $validate_branch = function($branch_id) use ($pdo, $rid) {
         if (!$branch_id) return null;
@@ -368,6 +371,7 @@ input[type=color] {
     <?php endif; ?>
 
     <form method="POST" enctype="multipart/form-data">
+    <?= csrf_field() ?>
     <div class="profile-grid">
 
         <!-- البيانات الأساسية -->
@@ -715,6 +719,7 @@ input[type=color] {
                     تعديل
                 </button>
                 <form method="POST" style="display:inline;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="staff_action" value="toggle_staff">
                     <input type="hidden" name="staff_id" value="<?= $st['id'] ?>">
                     <button type="submit" style="padding:6px 12px;border-radius:8px;border:1px solid var(--line);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;background:<?= $st['is_active']?'rgba(34,197,94,0.1)':'var(--bg3)' ?>;color:<?= $st['is_active']?'#22C55E':'var(--ink2)' ?>;">
@@ -722,6 +727,7 @@ input[type=color] {
                     </button>
                 </form>
                 <form method="POST" onsubmit="return confirm('حذف الموظف؟')" style="display:inline;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="staff_action" value="delete_staff">
                     <input type="hidden" name="staff_id" value="<?= $st['id'] ?>">
                     <button type="submit" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(239,68,68,0.2);font-size:11px;font-weight:700;cursor:pointer;background:rgba(239,68,68,0.08);color:#EF4444;font-family:'Tajawal',sans-serif;">حذف</button>
@@ -748,6 +754,7 @@ input[type=color] {
             </div>
             <?php else: ?>
             <form method="POST">
+                <?= csrf_field() ?>
                 <input type="hidden" name="staff_action" value="add_staff">
                 <div class="staff-form-grid" style="margin-bottom:0;">
                     <div class="form-group">
@@ -798,6 +805,7 @@ input[type=color] {
             <button type="button" onclick="closeStaffEditModal()" class="staff-modal-close" aria-label="إغلاق">×</button>
         </div>
         <form method="POST" class="staff-modal-body">
+            <?= csrf_field() ?>
             <input type="hidden" name="staff_action" value="edit_staff">
             <input type="hidden" name="staff_id" id="edit_staff_id">
 
