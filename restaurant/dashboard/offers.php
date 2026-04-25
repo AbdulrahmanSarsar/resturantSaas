@@ -111,7 +111,7 @@ foreach($offers as &$o) {
 }
 unset($o);
 
-$all_dishes = $pdo->prepare("SELECT id,name,price,image FROM dishes_v2 WHERE restaurant_id=? AND is_available=1 ORDER BY name");
+$all_dishes = $pdo->prepare("SELECT id,name,price,image FROM dishes_v2 WHERE restaurant_id=? AND is_active=1 ORDER BY name");
 $all_dishes->execute([$rid]);
 $all_dishes = $all_dishes->fetchAll();
 
