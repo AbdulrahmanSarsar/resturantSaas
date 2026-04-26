@@ -157,11 +157,78 @@ require_once __DIR__ . '/src/Helpers/PriceHelper.php';
 // We just make sure PLAN_FEATURES constant exists for pages that use bootstrap without plan_guard.
 if (!defined('PLAN_FEATURES')) {
     define('PLAN_FEATURES', [
-        'basic'    => ['menu'],
-        'advanced' => ['menu', 'ar', 'ratings', 'stats'],
-        'premium'  => ['menu', 'ar', 'ratings', 'stats', 'orders', 'coupons', 'staff', 'shamcash'],
+        'basic' => [
+            'menu', 'branding', 'support_24h',
+        ],
+        'advanced' => [
+            'menu', 'branding', 'support_24h',
+            'ar', 'ratings', 'stats', 'reports',
+            'branch_compare', 'advanced_fonts', 'priority_support',
+        ],
+        'premium' => [
+            'menu', 'branding', 'support_24h',
+            'ar', 'ratings', 'stats', 'reports',
+            'branch_compare', 'advanced_fonts', 'priority_support',
+            'orders', 'staff', 'coupons', 'offers', 'shamcash',
+            'multi_branch', 'account_manager',
+        ],
     ]);
 }
 if (!defined('PLAN_RANK')) {
     define('PLAN_RANK', ['basic' => 1, 'advanced' => 2, 'premium' => 3]);
+}
+if (!defined('PLAN_PRICES')) {
+    define('PLAN_PRICES', ['basic' => 15, 'advanced' => 20, 'premium' => 25]);
+}
+if (!defined('PLAN_YEARLY_PRICES')) {
+    define('PLAN_YEARLY_PRICES', ['basic' => 150, 'advanced' => 200, 'premium' => 250]);
+}
+if (!defined('PLAN_BRANCH_LIMITS')) {
+    define('PLAN_BRANCH_LIMITS', ['basic' => 1, 'advanced' => 1, 'premium' => PHP_INT_MAX]);
+}
+
+/**
+ * تحقق إذا مطعم معيّن يدعم ميزة (للزبائن + الموظفين — بدون session restaurant_plan).
+ */
+if (!function_exists('restaurant_has_feature')) {
+    function restaurant_has_feature(int $rid, string $feature): bool {
+        global $pdo;
+        static $cache = [];
+        if (!isset($cache[$rid])) {
+            try {
+                $st = $pdo->prepare("SELECT subscription_plan FROM restaurants WHERE id = ?");
+                $st->execute([$rid]);
+                $cache[$rid] = $st->fetchColumn() ?: 'basic';
+            } catch (Exception $e) { $cache[$rid] = 'basic'; }
+        }
+        $plan = $cache[$rid];
+        return in_array($feature, PLAN_FEATURES[$plan] ?? [], true);
+    }
+}
+
+/**
+ * يطلق رسالة للموظف لو باقة المطعم ما تدعم ميزة الـ staff. أوقف التنفيذ.
+ */
+if (!function_exists('staff_feature_or_die')) {
+    function staff_feature_or_die(int $rid, string $feature, string $page_title = 'الميزة محجوبة'): void {
+        if (restaurant_has_feature($rid, $feature)) return;
+        http_response_code(403);
+        echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">';
+        echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
+        echo '<title>' . htmlspecialchars($page_title) . '</title>';
+        echo '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet">';
+        echo '<style>body{font-family:"Tajawal",sans-serif;background:#0C0C0C;color:#F0EBE3;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}';
+        echo '.box{max-width:420px;width:100%;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:36px;text-align:center;}';
+        echo '.ic{font-size:54px;margin-bottom:14px;}';
+        echo 'h1{font-size:20px;margin:0 0 10px;color:#FF6B35;}';
+        echo 'p{font-size:14px;line-height:1.7;color:rgba(240,235,227,0.6);margin:0 0 20px;}';
+        echo 'a.btn{display:block;padding:12px;background:#FF6B35;color:#fff;text-decoration:none;border-radius:12px;font-weight:800;}';
+        echo '</style></head><body><div class="box">';
+        echo '<div class="ic">🔒</div>';
+        echo '<h1>هاي الصفحة محجوبة</h1>';
+        echo '<p>صاحب المطعم لازم يرقّي الباقة إلى <b style="color:#FF6B35;">الاحترافية 👑</b><br>عشان تشتغل شاشات الموظفين (مطبخ / نادل / كاشير).</p>';
+        echo '<a class="btn" href="login.php">رجوع لتسجيل الدخول</a>';
+        echo '</div></body></html>';
+        exit;
+    }
 }

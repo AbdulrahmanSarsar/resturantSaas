@@ -20,6 +20,7 @@ require_once __DIR__ . '/plan_guard.php';
 if (!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
 }
+plan_feature_required('multi_branch'); // لوحة السلسلة للباقة الاحترافية فقط
 
 $rid    = $_SESSION['restaurant_id'];
 $period = intval($_GET['period'] ?? 30);

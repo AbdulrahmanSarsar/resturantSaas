@@ -21,6 +21,25 @@ if(!$restaurant) { http_response_code(404); die('غير موجود'); }
 
 $rid = $restaurant['id'];
 
+// ===== gate: نظام الطلبات للباقة الاحترافية فقط =====
+if (!restaurant_has_feature($rid, 'orders')) {
+    http_response_code(403);
+    echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">';
+    echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>الطلب غير متاح</title>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet">';
+    echo '<style>body{font-family:"Tajawal",sans-serif;background:#0C0C0C;color:#F0EBE3;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}';
+    echo '.box{max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px;text-align:center;}';
+    echo '.ic{font-size:48px;margin-bottom:14px;}h1{font-size:18px;margin:0 0 10px;color:#FF6B35;}p{font-size:13px;line-height:1.7;color:rgba(240,235,227,0.6);margin:0 0 20px;}';
+    echo 'a.btn{display:block;padding:11px;background:#FF6B35;color:#fff;text-decoration:none;border-radius:12px;font-weight:800;font-size:13px;}</style></head>';
+    echo '<body><div class="box"><div class="ic">🍽️</div>';
+    echo '<h1>الطلب الإلكتروني غير متاح</h1>';
+    echo '<p>هاد المطعم بيعرض المنيو فقط حالياً. للطلب، الرجاء التحدث مع النادل.</p>';
+    echo '<a class="btn" href="/menu/' . urlencode($slug) . '/' . urlencode($branch_slug) . '">← العودة للمنيو</a>';
+    echo '</div></body></html>';
+    exit;
+}
+
 // ===== جلب الفرع =====
 /** @var \MenuPro\Services\BranchService $branchService */
 $branchService = service('branch');

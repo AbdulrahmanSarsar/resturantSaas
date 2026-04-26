@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../../bootstrap.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
+plan_required('advanced'); // التقارير ميزة الباقة المتقدمة فما فوق
 
 $rid = $_SESSION['restaurant_id'];
 

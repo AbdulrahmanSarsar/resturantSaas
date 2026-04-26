@@ -44,9 +44,12 @@ $items = $items->fetchAll();
 
 $primary   = '#FF6B35';
 $secondary = '#F7C59F';
-$shamcash_enabled = !empty($restaurant['shamcash_enabled']);
-$shamcash_number  = $restaurant['shamcash_number'] ?? '';
-$shamcash_qr      = $restaurant['shamcash_qr'] ?? '';
+// gate: ShamCash متاح فقط لو الباقة تدعمه (الاحترافية)
+$rid_for_plan     = (int)$order['restaurant_id'];
+$plan_has_sham    = restaurant_has_feature($rid_for_plan, 'shamcash');
+$shamcash_enabled = $plan_has_sham && !empty($restaurant['shamcash_enabled']);
+$shamcash_number  = $shamcash_enabled ? ($restaurant['shamcash_number'] ?? '') : '';
+$shamcash_qr      = $shamcash_enabled ? ($restaurant['shamcash_qr'] ?? '') : '';
 
 // ===== العملة =====
 $cur_symbol   = $restaurant['currency_symbol']   ?? '$';

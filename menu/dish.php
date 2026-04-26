@@ -147,11 +147,16 @@ $cat_stmt = $pdo->prepare("SELECT name, name_en FROM categories_v2 WHERE id=?");
 $cat_stmt->execute([$dish['category_id']]);
 $cat = $cat_stmt->fetch();
 
+// ===== flags للباقة =====
+$can_order = restaurant_has_feature($rid, 'orders');
+$can_ar    = restaurant_has_feature($rid, 'ar');
+
 // ===== AR/3D =====
 $primary   = '#FF6B35';
 $secondary = '#F7C59F';
-$has_ar    = !empty($dish['has_model3d']) && !empty($dish['model3d_file']);
-$has_usdz  = !empty($dish['model3d_usdz']);
+// AR متاح فقط لو الباقة تدعمه
+$has_ar    = $can_ar && !empty($dish['has_model3d']) && !empty($dish['model3d_file']);
+$has_usdz  = $can_ar && !empty($dish['model3d_usdz']);
 $glb_url   = $has_ar   ? BASE_URL . '/assets/uploads/models3d/' . $dish['model3d_file'] : '';
 $usdz_url  = $has_usdz ? BASE_URL . '/assets/uploads/models3d/' . $dish['model3d_usdz'] : '';
 ?>
@@ -582,7 +587,7 @@ $usdz_url  = $has_usdz ? BASE_URL . '/assets/uploads/models3d/' . $dish['model3d
         <span style="font-size:18px;">⚠️</span>
         <span style="font-size:14px;font-weight:800;color:#F59E0B;" id="soldOutText">نفذ هذا الطبق اليوم</span>
     </div>
-    <?php else: ?>
+    <?php elseif($can_order): ?>
     <div class="qty-wrap">
         <button class="qty-btn" onclick="changeQty(-1)">−</button>
         <span class="qty-num" id="qtyNum">1</span>
@@ -598,12 +603,14 @@ $usdz_url  = $has_usdz ? BASE_URL . '/assets/uploads/models3d/' . $dish['model3d
 <div class="toast" id="toast"></div>
 <button class="lang-toggle" id="langToggle" onclick="toggleLang()">EN</button>
 
-<!-- Go to Cart — رابط محدّث يحمل branch_slug -->
+<!-- Go to Cart — رابط محدّث يحمل branch_slug — مخفي للباقات اللي ما تدعم الطلبات -->
+<?php if($can_order): ?>
 <a href="<?= BASE_URL ?>/menu/<?= $slug ?>/<?= $branch_url ?>/cart" class="go-cart-btn" id="goCartBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.96-1.61L23 6H6"/></svg>
     <span id="goCartText">عرض السلة</span>
     <div class="go-cart-count" id="goCartCount">0</div>
 </a>
+<?php endif; ?>
 
 <button class="theme-toggle" onclick="toggleTheme()">
     <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>

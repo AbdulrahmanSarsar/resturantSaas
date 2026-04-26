@@ -3,8 +3,8 @@
  * waiter.php — Branch-scoped patch
  */
 session_start();
-require_once '../../config/database.php';
-require_once '../../config/csrf.php';
+require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'waiter') {
     header('Location: login.php'); exit;
@@ -12,6 +12,9 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'waiter') {
 
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
+
+// gate: شاشة النادل ميزة الباقة الاحترافية فقط
+staff_feature_or_die($rid, 'staff', 'النادل — محجوب');
 
 // branch_id من الـ DB — محمي بـ try/catch لو العمود ما موجود بعد
 $branch_id   = null;

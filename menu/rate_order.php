@@ -1,5 +1,5 @@
 <?php
-require_once '../config/database.php';
+require_once __DIR__ . '/../bootstrap.php';
 
 $slug     = $_GET['slug']  ?? '';
 $order_id = intval($_GET['id'] ?? 0);
@@ -8,6 +8,12 @@ $stmt = $pdo->prepare("SELECT * FROM restaurants WHERE slug=? AND is_active=1");
 $stmt->execute([$slug]);
 $restaurant = $stmt->fetch();
 if(!$restaurant) die('غير موجود');
+
+// gate: التقييمات للباقة المتقدمة فما فوق
+if (!restaurant_has_feature((int)$restaurant['id'], 'ratings')) {
+    header("Location: " . BASE_URL . "/menu/$slug/invoice/$order_id");
+    exit;
+}
 
 $order = $pdo->prepare("SELECT * FROM orders WHERE id=? AND restaurant_id=? AND status='delivered'");
 $order->execute([$order_id, $restaurant['id']]);

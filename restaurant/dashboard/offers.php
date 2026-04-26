@@ -4,6 +4,7 @@ require_once '../../config/database.php';
 require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
+plan_required('premium'); // العروض ميزة الباقة الاحترافية
 $rid     = $_SESSION['restaurant_id'];
 $success = '';
 $error   = '';

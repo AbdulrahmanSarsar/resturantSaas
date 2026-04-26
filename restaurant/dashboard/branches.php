@@ -12,7 +12,7 @@
  */
 require_once __DIR__ . '/../../bootstrap.php';
 require_once __DIR__ . '/../../config/csrf.php';
-// plan_guard.php بيتحمّل تلقائياً من sidebar.php
+require_once __DIR__ . '/plan_guard.php';
 
 if (!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
@@ -42,6 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- إضافة فرع ---
     if ($action === 'add') {
+        // gate: الباقة لازم تدعم multi_branch إذا فيه فرع موجود
+        $cnt = $pdo->prepare("SELECT COUNT(*) FROM branches WHERE restaurant_id=?");
+        $cnt->execute([$rid]);
+        $existing = (int)$cnt->fetchColumn();
+        if ($existing >= plan_max_branches()) {
+            plan_feature_required('multi_branch'); // يطلع صفحة الترقية ويوقف التنفيذ
+        }
+
         $name    = trim($_POST['name'] ?? '');
         $name_en = trim($_POST['name_en'] ?? '');
         $address = trim($_POST['address'] ?? '');
@@ -546,13 +554,28 @@ require_once __DIR__ . '/sidebar.php';
         <?php endforeach; ?>
 
         <!-- Add new branch card -->
-        <div class="add-branch-card" onclick="openAddModal()">
-            <div class="add-branch-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <?php
+        // gate الزر بصرياً: لو عدد الفروع وصل للحد، اعرضه مقفول مع badge
+        $branch_limit_reached = (count($branches ?? []) >= plan_max_branches());
+        ?>
+        <?php if ($branch_limit_reached): ?>
+            <div class="add-branch-card" style="opacity:0.55;cursor:not-allowed;border-style:dashed;position:relative;"
+                 onclick="alert('لإضافة فروع متعددة، رقّي باقتك إلى الاحترافية 👑'); window.location='?upgrade=multi_branch';">
+                <div class="add-branch-icon" style="background:rgba(245,158,11,0.12);color:#F59E0B;">
+                    🔒
+                </div>
+                <div class="add-branch-title">إضافة فرع جديد</div>
+                <div class="add-branch-sub" style="color:#F59E0B;font-weight:700;">👑 يتطلب الباقة الاحترافية</div>
             </div>
-            <div class="add-branch-title">إضافة فرع جديد</div>
-            <div class="add-branch-sub">كل فرع يحصل على منيو وQR code مستقل</div>
-        </div>
+        <?php else: ?>
+            <div class="add-branch-card" onclick="openAddModal()">
+                <div class="add-branch-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </div>
+                <div class="add-branch-title">إضافة فرع جديد</div>
+                <div class="add-branch-sub">كل فرع يحصل على منيو وQR code مستقل</div>
+            </div>
+        <?php endif; ?>
     </div>
 
 </div>

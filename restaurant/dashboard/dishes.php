@@ -32,6 +32,12 @@ $cats = $catService->getActiveForRestaurant($rid);
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     csrf_require();
 
+    // Server-side gate: لو الباقة ما تدعم AR، اطرح ملفات .glb/.usdz من المُدخل قبل التمرير للـ service
+    if (!plan_has_feature('ar')) {
+        unset($_FILES['model3d'], $_FILES['model3d_usdz']);
+        unset($_POST['old_model'], $_POST['old_usdz']); // يمنع IDs قديمة من الانحفاظ
+    }
+
     if($_POST['action'] === 'add') {
         $result = $dishService->create($rid, $_POST, $_FILES, $active_branch_id);
         $success = $result['message'];

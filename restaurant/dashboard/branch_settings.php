@@ -92,7 +92,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if($_POST['action'] === 'save_payment') {
-        $shamcash_enabled = isset($_POST['shamcash_enabled']) ? 1 : 0;
+        // server-side gate: لو الباقة ما تدعم shamcash، اجبر العطل
+        $shamcash_enabled = (plan_has_feature('shamcash') && isset($_POST['shamcash_enabled'])) ? 1 : 0;
         $pdo->prepare("
             UPDATE branch_settings SET
                 shamcash_enabled = ?,
@@ -288,23 +289,33 @@ require_once 'sidebar.php';
                 <span class="fc-title">طرق الدفع</span>
             </div>
             <div class="fc-body">
-                <div class="toggle-row">
+                <?php $can_shamcash = plan_has_feature('shamcash'); ?>
+                <?php if(!$can_shamcash): ?>
+                <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:22px;">🔒</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:800;color:#F59E0B;font-size:13px;">ميزة محجوبة</div>
+                        <div style="font-size:11px;color:rgba(240,235,227,.6);margin-top:2px;">الدفع بشام كاش متاح في الباقة الاحترافية فقط 👑</div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <div class="toggle-row" <?= !$can_shamcash ? 'style="opacity:0.5;pointer-events:none;"' : '' ?>>
                     <div class="toggle-info">
                         <div class="toggle-label">ShamCash</div>
                         <div class="toggle-sub">تفعيل الدفع عبر ShamCash</div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" name="shamcash_enabled" <?= ($settings['shamcash_enabled'] ?? 0) ? 'checked' : '' ?>>
+                        <input type="checkbox" name="shamcash_enabled" <?= ($settings['shamcash_enabled'] ?? 0) ? 'checked' : '' ?> <?= !$can_shamcash ? 'disabled' : '' ?>>
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="form-group" style="margin-top:14px;">
+                <div class="form-group" style="margin-top:14px;<?= !$can_shamcash ? 'opacity:0.5;pointer-events:none;' : '' ?>">
                     <label>رقم ShamCash</label>
-                    <input type="tel" name="shamcash_number" value="<?= htmlspecialchars($settings['shamcash_number'] ?? '') ?>" placeholder="09xxxxxxxx">
+                    <input type="tel" name="shamcash_number" value="<?= htmlspecialchars($settings['shamcash_number'] ?? '') ?>" placeholder="09xxxxxxxx" <?= !$can_shamcash ? 'disabled' : '' ?>>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="<?= !$can_shamcash ? 'opacity:0.5;pointer-events:none;' : '' ?>">
                     <label>رابط QR للدفع</label>
-                    <input type="url" name="shamcash_qr" value="<?= htmlspecialchars($settings['shamcash_qr'] ?? '') ?>" placeholder="https://...">
+                    <input type="url" name="shamcash_qr" value="<?= htmlspecialchars($settings['shamcash_qr'] ?? '') ?>" placeholder="https://..." <?= !$can_shamcash ? 'disabled' : '' ?>>
                 </div>
             </div>
             <div class="fc-footer">

@@ -29,6 +29,11 @@ if($restaurant['subscription_expiry'] && $restaurant['subscription_expiry'] < da
 
 $rid = $restaurant['id'];
 
+// ===== flags للباقة (menu-only vs full ordering) =====
+$can_order = restaurant_has_feature($rid, 'orders'); // basic/advanced = منيو فقط
+$can_ar    = restaurant_has_feature($rid, 'ar');
+$can_rate  = restaurant_has_feature($rid, 'ratings');
+
 // ===== جلب الفرع (branch-aware) =====
 /** @var \MenuPro\Services\BranchService $branchService */
 $branchService = service('branch');
@@ -681,19 +686,21 @@ $branch_url = $branch['slug'];
                                 </div>
                                 <?php if($restaurant['subscription_plan'] === 'premium'): ?>
                                 <?php if(empty($dish['sold_out'])): ?>
-                                <?php if(!empty($dish_opts)): ?>
-                                <button class="add-btn" id="add-<?= $dish['id'] ?>"
-                                        style="background:var(--p);"
-                                        onclick="event.preventDefault(); openOptsFromCard(event, this)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    <span class="add-btn-check">✓</span>
-                                </button>
-                                <?php else: ?>
-                                <button class="add-btn" id="add-<?= $dish['id'] ?>"
-                                        onclick="event.preventDefault(); addToCart(<?= $dish['id'] ?>, '<?= htmlspecialchars($dish['name'], ENT_QUOTES) ?>', <?= $fp ?>, this, '<?= htmlspecialchars($dish['name_en'] ?? '', ENT_QUOTES) ?>', '<?= $dish['image'] ?>')">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    <span class="add-btn-check">✓</span>
-                                </button>
+                                <?php if($can_order): ?>
+                                    <?php if(!empty($dish_opts)): ?>
+                                    <button class="add-btn" id="add-<?= $dish['id'] ?>"
+                                            style="background:var(--p);"
+                                            onclick="event.preventDefault(); openOptsFromCard(event, this)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        <span class="add-btn-check">✓</span>
+                                    </button>
+                                    <?php else: ?>
+                                    <button class="add-btn" id="add-<?= $dish['id'] ?>"
+                                            onclick="event.preventDefault(); addToCart(<?= $dish['id'] ?>, '<?= htmlspecialchars($dish['name'], ENT_QUOTES) ?>', <?= $fp ?>, this, '<?= htmlspecialchars($dish['name_en'] ?? '', ENT_QUOTES) ?>', '<?= $dish['image'] ?>')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        <span class="add-btn-check">✓</span>
+                                    </button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                                 <?php else: ?>
                                 <span class="sold-out-small-text" style="font-size:11px;font-weight:800;color:#F59E0B;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);padding:5px 10px;border-radius:10px;white-space:nowrap;">نفذ</span>
@@ -731,7 +738,7 @@ $branch_url = $branch['slug'];
     </div>
 </div>
 
-<?php if($restaurant['subscription_plan'] === 'premium'): ?>
+<?php if($can_order): ?>
 <button class="cart-bar" id="cartBar"
         onclick="window.location.href='<?= BASE_URL ?>/menu/<?= $slug ?>/<?= $branch_url ?>/cart'">
     <div class="cart-bar-inner">

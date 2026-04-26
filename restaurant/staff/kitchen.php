@@ -8,8 +8,8 @@
  *   - لو branch_id = NULL → يشوف كل الطلبات (backward compatible)
  */
 session_start();
-require_once '../../config/database.php';
-require_once '../../config/csrf.php';
+require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../config/csrf.php';
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
     header('Location: login.php'); exit;
@@ -17,6 +17,9 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
 
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
+
+// gate: شاشة المطبخ ميزة الباقة الاحترافية فقط
+staff_feature_or_die($rid, 'staff', 'المطبخ — محجوب');
 
 // ===== جلب branch_id من الـ DB — محمي بـ try/catch =====
 $branch_id     = null;

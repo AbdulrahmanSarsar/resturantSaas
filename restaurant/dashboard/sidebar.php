@@ -91,10 +91,14 @@ $nav_items = [
 ];
 
 $page_feature_map = [
-    'orders.php'  => 'orders',
-    'coupons.php' => 'coupons',
-    'ratings.php' => 'ratings',
-    'stats.php'   => 'stats',
+    'chain.php'    => 'multi_branch',
+    'offers.php'   => 'offers',
+    'orders.php'   => 'orders',
+    'coupons.php'  => 'coupons',
+    'ratings.php'  => 'ratings',
+    'stats.php'    => 'stats',
+    'reports.php'  => 'reports',
+    // branches.php مفتوحة للكل (basic/advanced عندهم فرع واحد بس) — القفل جوا الصفحة على إضافة فرع جديد
 ];
 $nav_items = array_map(function ($item) use ($page_feature_map) {
     $feature        = $page_feature_map[$item[0]] ?? null;
