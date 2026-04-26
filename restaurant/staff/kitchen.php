@@ -510,7 +510,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 
             <!-- Header -->
             <div class="ocard-head">
-                <div class="ocard-num">#<?= $o['id'] ?></div>
+                <div class="ocard-num">#<?= $o['display_num'] ?? $o['id'] ?></div>
                 <div class="table-chip">🪑 <?= htmlspecialchars($o['table_number']) ?></div>
                 <?php if($o['customer_name']): ?>
                 <div style="font-size:11px;color:var(--ink2);font-weight:600;">👤 <?= htmlspecialchars($o['customer_name']) ?></div>

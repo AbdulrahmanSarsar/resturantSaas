@@ -343,7 +343,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
         ?>
         <div class="ocard st-<?= $o['status'] ?>" id="oc-<?= $o['id'] ?>" style="animation-delay:<?= min($idx*.05,.3) ?>s">
             <div class="ocard-head">
-                <div class="ocard-num">#<?= $o['id'] ?></div>
+                <div class="ocard-num">#<?= $o['display_num'] ?? $o['id'] ?></div>
                 <div class="table-chip">طاولة <?= htmlspecialchars($o['table_number']) ?></div>
                 <div class="status-chip sc-<?= $o['status'] ?>"><?= $status_labels[$o['status']] ?></div>
                 <div class="ocard-time"><?= date('H:i', strtotime($o['created_at'])) ?></div>

@@ -446,7 +446,7 @@ $days_left = $expiry ? ceil((strtotime($expiry) - time()) / 86400) : 0;
                 ];
                 foreach($last_orders as $o): ?>
                 <div class="order-row">
-                    <div class="order-id">#<?= $o['id'] ?></div>
+                    <div class="order-id">#<?= $o['branch_order_number'] ?? $o['restaurant_order_number'] ?? $o['id'] ?></div>
                     <div class="order-table-tag">طاولة <?= htmlspecialchars($o['table_number']) ?></div>
                     <?php if($o['customer_name']): ?>
                         <div class="order-name"><?= htmlspecialchars($o['customer_name']) ?></div>
