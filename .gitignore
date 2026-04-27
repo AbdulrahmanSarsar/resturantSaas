@@ -1,0 +1,32 @@
+# Local development overrides — كل مطور بكتب إعداداته
+config/database.local.php
+
+# Logs
+*.log
+error_log
+php_errorlog
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Temporary uploads (لو في staging area)
+assets/uploads/_tmp/
+*.tmp
+
+# PHP build artifacts (لو استعملنا composer مستقبلاً)
+vendor/
+composer.lock
+
+# Claude Code worktrees (داخلي)
+.claude/
+
+# Windows shortcuts ضمن Downloads
+Downloads - Shortcut.lnk

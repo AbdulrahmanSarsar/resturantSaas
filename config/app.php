@@ -25,14 +25,18 @@ if ($env === 'production') {
 }
 
 // ============================================================
-// Database Configuration
+// Database Configuration — مصدر واحد عبر database.php
 // ============================================================
-// Try .env first, fall back to constants for backward compatibility
+// database.php عنده auto-detect بيشيك إذا localhost ويحمّل database.local.php
+// لذلك بدل ما نكرّر credentials هنا، نحمّل database.php اللي يعرّف
+// DB_HOST/DB_USER/DB_PASS/DB_NAME/BASE_URL + ينشئ $pdo.
+require_once __DIR__ . '/database.php';
+
 $db_config = [
-    'host'    => getenv('DB_HOST')    ?: 'localhost',
-    'name'    => getenv('DB_NAME')    ?: 'u689381734_menu_database',
-    'user'    => getenv('DB_USER')    ?: 'u689381734_menu_database',
-    'pass'    => getenv('DB_PASS')    ?: '3Bood$@r$@r2006',  // NEVER hardcode in repo
+    'host'    => DB_HOST,
+    'name'    => DB_NAME,
+    'user'    => DB_USER,
+    'pass'    => DB_PASS,
     'charset' => 'utf8mb4',
 ];
 
@@ -42,7 +46,8 @@ $db_config = [
 define('APP_ENV',      $env);
 define('APP_NAME',     'MenuPro');
 define('APP_VERSION',  '2.0.0');
-define('BASE_URL',     getenv('BASE_URL') ?: 'https://menu.almanarsoft.com');
+// BASE_URL متعرف بـ database.php — defined() check يمنع redeclare warning
+if (!defined('BASE_URL')) define('BASE_URL', getenv('BASE_URL') ?: 'https://menu.almanarsoft.com');
 define('UPLOAD_DIR',   rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/') . '/assets/uploads/');
 
 // Security

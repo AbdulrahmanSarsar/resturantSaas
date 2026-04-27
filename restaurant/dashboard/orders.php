@@ -4,7 +4,7 @@ require_once '../../config/database.php';
 require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
-plan_required('premium');
+plan_required('advanced'); // نظام الطلبات متاح للمتقدمة + الاحترافية
 
 $rid = $_SESSION['restaurant_id'];
 $rest_data = $pdo->prepare("SELECT currency_symbol, currency_decimals FROM restaurants WHERE id=?");

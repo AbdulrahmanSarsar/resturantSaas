@@ -6,7 +6,7 @@ require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
 }
-plan_required('premium');
+plan_required('advanced'); // الكوبونات متاحة للمتقدمة + الاحترافية
 
 $rid = $_SESSION['restaurant_id'];
 $active_branch_id = $_SESSION['active_branch_id'] ?? null;

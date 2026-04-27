@@ -1,10 +1,32 @@
 <?php
-// Production error handling — log errors, don't echo to users.
-// (localhost still shows them via php.ini settings)
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
+// ===== Auto-detect environment (local dev vs production) =====
+// Local: HTTP_HOST = localhost / 127.0.0.1 → استخدم XAMPP defaults + override من .env.local
+// Production: HTTP_HOST = menu.almanarsoft.com → استخدم Hostinger
+$__is_local = (
+    PHP_SAPI === 'cli-server' ||
+    in_array(($_SERVER['HTTP_HOST'] ?? ''), ['localhost', '127.0.0.1'], true) ||
+    str_starts_with(($_SERVER['HTTP_HOST'] ?? ''), 'localhost:') ||
+    str_starts_with(($_SERVER['HTTP_HOST'] ?? ''), '127.0.0.1:')
+);
+
+// محلي: اعرض الأخطاء بالشاشة. إنتاج: log فقط
+if ($__is_local) {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+} else {
+    ini_set('display_errors', 0);
+    ini_set('log_errors', 1);
+}
 error_reporting(E_ALL);
 
+// تحميل override محلي إذا موجود (config/database.local.php) — مش commit للـ git
+$__local_config = __DIR__ . '/database.local.php';
+if ($__is_local && is_file($__local_config)) {
+    require $__local_config;
+}
+unset($__local_config, $__is_local);
+
+// defaults — بترتيب: local override → environment → production hardcoded
 if (!defined('DB_HOST'))  define('DB_HOST', 'localhost');
 if (!defined('DB_USER'))  define('DB_USER', 'u689381734_menu_database');
 if (!defined('DB_PASS'))  define('DB_PASS', '3Bood$@r$@r2006');

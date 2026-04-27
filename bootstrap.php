@@ -164,13 +164,15 @@ if (!defined('PLAN_FEATURES')) {
             'menu', 'branding', 'support_24h',
             'ar', 'ratings', 'stats', 'reports',
             'branch_compare', 'advanced_fonts', 'priority_support',
+            'orders', 'staff', 'coupons', 'offers', // ← انتقلوا من premium
         ],
         'premium' => [
             'menu', 'branding', 'support_24h',
             'ar', 'ratings', 'stats', 'reports',
             'branch_compare', 'advanced_fonts', 'priority_support',
-            'orders', 'staff', 'coupons', 'offers', 'shamcash',
-            'multi_branch', 'account_manager',
+            'orders', 'staff', 'coupons', 'offers',
+            'shamcash', 'multi_branch',
+            'direct_support', 'onboarding_training', // ← بديل account_manager
         ],
     ]);
 }
