@@ -171,8 +171,9 @@ if (!defined('PLAN_FEATURES')) {
             'ar', 'ratings', 'stats', 'reports',
             'branch_compare', 'advanced_fonts', 'priority_support',
             'orders', 'staff', 'coupons', 'offers',
-            'shamcash', 'multi_branch',
-            'direct_support', 'onboarding_training', // ← بديل account_manager
+            // [removed] shamcash — تم إلغاء شام كاش بالكامل
+            'multi_branch',
+            'direct_support', 'onboarding_training',
         ],
     ]);
 }

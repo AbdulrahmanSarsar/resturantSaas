@@ -14,7 +14,7 @@
  *   basic    $15/شهر  — منيو فقط: QR + ألوان/شعار + فرع واحد + دعم 24h
  *   advanced $20/شهر  — + AR + تقييمات + إحصائيات + تقارير + ضرائب
  *                       + طلبات لحظي + موظفين + كوبونات + عروض
- *   premium  $25/شهر  — + شام كاش + فروع متعددة + دعم واتساب مباشر + تدريب أونلاين
+ *   premium  $25/شهر  — + فروع متعددة + دعم واتساب مباشر + تدريب أونلاين
  */
 
 // ===== تعريف الميزات لكل باقة =====
@@ -56,10 +56,10 @@ if (!defined('PLAN_FEATURES')) {
             'staff',
             'coupons',
             'offers',
-            'shamcash',           // شام كاش (premium-only)
+            // [removed] shamcash — تم إلغاء شام كاش بالكامل
             'multi_branch',       // فروع متعددة (premium-only)
-            'direct_support',     // دعم واتساب مباشر (رد خلال ساعة) — بديل account_manager
-            'onboarding_training',// تدريب أونلاين للفريق (جلسة Zoom 30 د) — بديل account_manager
+            'direct_support',     // دعم واتساب مباشر (رد خلال ساعة)
+            'onboarding_training',// تدريب أونلاين للفريق (جلسة Zoom 30 د)
         ],
     ]);
 }
@@ -168,7 +168,6 @@ function plan_show_upgrade_page(string $required, string $current): void {
             'دعم أولوية',
         ],
         'premium'  => [
-            'دفع شام كاش + نقدي',
             'فروع متعددة (غير محدود)',
             'دعم واتساب مباشر (رد خلال ساعة)',
             'تدريب أونلاين للفريق (جلسة Zoom)',

@@ -91,23 +91,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $success = 'تم حفظ إعدادات العملة!';
     }
 
-    if($_POST['action'] === 'save_payment') {
-        // server-side gate: لو الباقة ما تدعم shamcash، اجبر العطل
-        $shamcash_enabled = (plan_has_feature('shamcash') && isset($_POST['shamcash_enabled'])) ? 1 : 0;
-        $pdo->prepare("
-            UPDATE branch_settings SET
-                shamcash_enabled = ?,
-                shamcash_number = ?,
-                shamcash_qr = ?
-            WHERE branch_id = ?
-        ")->execute([
-            $shamcash_enabled,
-            trim($_POST['shamcash_number'] ?? ''),
-            trim($_POST['shamcash_qr'] ?? ''),
-            $branch_id
-        ]);
-        $success = 'تم حفظ إعدادات الدفع!';
-    }
+    // [removed] save_payment — قسم شام كاش تم إلغاؤه (الدفع نقدي للكاشير فقط)
 
     if($_POST['action'] === 'save_notifications') {
         $whatsapp_enabled = isset($_POST['whatsapp_notifications']) ? 1 : 0;
@@ -278,53 +262,7 @@ require_once 'sidebar.php';
             </div>
         </form>
 
-        <!-- ===== طرق الدفع ===== -->
-        <form method="POST" class="fc">
-            <?= csrf_field() ?>
-            <input type="hidden" name="action" value="save_payment">
-            <div class="fc-head">
-                <div class="fc-head-icon" style="background:rgba(59,130,246,.12);color:#3B82F6">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                </div>
-                <span class="fc-title">طرق الدفع</span>
-            </div>
-            <div class="fc-body">
-                <?php $can_shamcash = plan_has_feature('shamcash'); ?>
-                <?php if(!$can_shamcash): ?>
-                <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:22px;">🔒</span>
-                    <div style="flex:1;">
-                        <div style="font-weight:800;color:#F59E0B;font-size:13px;">ميزة محجوبة</div>
-                        <div style="font-size:11px;color:rgba(240,235,227,.6);margin-top:2px;">الدفع بشام كاش متاح في الباقة الاحترافية فقط 👑</div>
-                    </div>
-                </div>
-                <?php endif; ?>
-                <div class="toggle-row" <?= !$can_shamcash ? 'style="opacity:0.5;pointer-events:none;"' : '' ?>>
-                    <div class="toggle-info">
-                        <div class="toggle-label">ShamCash</div>
-                        <div class="toggle-sub">تفعيل الدفع عبر ShamCash</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" name="shamcash_enabled" <?= ($settings['shamcash_enabled'] ?? 0) ? 'checked' : '' ?> <?= !$can_shamcash ? 'disabled' : '' ?>>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="form-group" style="margin-top:14px;<?= !$can_shamcash ? 'opacity:0.5;pointer-events:none;' : '' ?>">
-                    <label>رقم ShamCash</label>
-                    <input type="tel" name="shamcash_number" value="<?= htmlspecialchars($settings['shamcash_number'] ?? '') ?>" placeholder="09xxxxxxxx" <?= !$can_shamcash ? 'disabled' : '' ?>>
-                </div>
-                <div class="form-group" style="<?= !$can_shamcash ? 'opacity:0.5;pointer-events:none;' : '' ?>">
-                    <label>رابط QR للدفع</label>
-                    <input type="url" name="shamcash_qr" value="<?= htmlspecialchars($settings['shamcash_qr'] ?? '') ?>" placeholder="https://..." <?= !$can_shamcash ? 'disabled' : '' ?>>
-                </div>
-            </div>
-            <div class="fc-footer">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    حفظ الدفع
-                </button>
-            </div>
-        </form>
+        <!-- [removed] قسم طرق الدفع — شام كاش تم إلغاؤه. الدفع نقدي للكاشير فقط. -->
 
         <!-- ===== الإشعارات ===== -->
         <form method="POST" class="fc">
