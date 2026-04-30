@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * kitchen.php — Branch-scoped (patch)
  *
@@ -11,6 +11,8 @@ session_start();
 require_once __DIR__ . '/../../bootstrap.php';
 require_once __DIR__ . '/../../config/csrf.php';
 
+use MenuPro\Helpers\DemoProgression;
+
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
     header('Location: login.php'); exit;
 }
@@ -18,8 +20,11 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
 
-// gate: شاشة المطبخ ميزة الباقة الاحترافية فقط
+// gate: شاشة المطبخ ميزة المتقدمة + الاحترافية
 staff_feature_or_die($rid, 'staff', 'المطبخ — محجوب');
+
+// === Demo: cleanup للطلبات القديمة ===
+DemoProgression::cleanupOldOrders($pdo, $rid);
 
 // ===== جلب branch_id من الـ DB — محمي بـ try/catch =====
 $branch_id     = null;
@@ -172,6 +177,11 @@ if(false) { // placeholder
         $orders_stmt->execute([$rid]);
     }
     $orders = $orders_stmt->fetchAll();
+
+    // === Demo: lazy progression — يحرّك الطلبات تلقائياً ===
+    $orders = DemoProgression::progressMany($pdo, $rid, $orders);
+    // Re-filter بعد التقدم: لو طلب صار ready/delivered/paid، اطلعه من شاشة المطبخ
+    $orders = array_values(array_filter($orders, fn($o) => in_array($o['status'], ['pending','confirmed','preparing'])));
 
     // Batch-load order_items بدل N+1
     $items_by_order = [];
@@ -434,6 +444,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 </style>
 </head>
 <body>
+<?= demo_banner_html() ?>
 
 <div class="topbar">
     <div class="topbar-stripe"></div>

@@ -2,12 +2,31 @@
 // ===== Auto-detect environment (local dev vs production) =====
 // Local: HTTP_HOST = localhost / 127.0.0.1 → استخدم XAMPP defaults + override من .env.local
 // Production: HTTP_HOST = menu.almanarsoft.com → استخدم Hostinger
+// Demo: HTTP_HOST = demo.menu.almanarsoft.com → demo mode (يحدد DEMO_MODE constant)
+$__http_host = strtolower($_SERVER['HTTP_HOST'] ?? '');
 $__is_local = (
     PHP_SAPI === 'cli-server' ||
-    in_array(($_SERVER['HTTP_HOST'] ?? ''), ['localhost', '127.0.0.1'], true) ||
-    str_starts_with(($_SERVER['HTTP_HOST'] ?? ''), 'localhost:') ||
-    str_starts_with(($_SERVER['HTTP_HOST'] ?? ''), '127.0.0.1:')
+    in_array($__http_host, ['localhost', '127.0.0.1'], true) ||
+    str_starts_with($__http_host, 'localhost:') ||
+    str_starts_with($__http_host, '127.0.0.1:')
 );
+
+// ===== Demo mode detection =====
+// Subdomain demo.menu.almanarsoft.com → DEMO_MODE = true
+// محلياً: ?demo=1 يفعّله ويحفظ cookie لـ 24 ساعة. ?demo=0 يطفّيه.
+if (!defined('DEMO_MODE')) {
+    if ($__is_local) {
+        if (($_GET['demo'] ?? '') === '1') { setcookie('demo_mode', '1', time() + 86400, '/'); $_COOKIE['demo_mode'] = '1'; }
+        if (($_GET['demo'] ?? '') === '0') { setcookie('demo_mode', '', time() - 3600, '/'); unset($_COOKIE['demo_mode']); }
+    }
+    $__is_demo_host = (
+        $__http_host === 'demo.menu.almanarsoft.com' ||
+        str_starts_with($__http_host, 'demo.localhost') ||
+        ($__is_local && ($_COOKIE['demo_mode'] ?? '') === '1')
+    );
+    define('DEMO_MODE', $__is_demo_host);
+}
+unset($__http_host);
 
 // محلي: اعرض الأخطاء بالشاشة. إنتاج: log فقط
 if ($__is_local) {

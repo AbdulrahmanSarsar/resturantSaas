@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * menu/index.php — صفحة المنيو (المرحلة 4 + 11)
  * 
@@ -14,6 +14,11 @@ require_once __DIR__ . '/../bootstrap.php';
 $table_from_qr = intval($_GET['table'] ?? 0);
 $slug          = $_GET['slug'] ?? '';
 $branch_slug   = $_GET['branch'] ?? '';
+
+// === Demo subdomain: لو ما في slug → redirect تلقائي لمطعم demo ===
+if (!$slug && defined('DEMO_MODE') && DEMO_MODE) {
+    header('Location: ' . BASE_URL . '/menu/demo'); exit;
+}
 
 if(!$slug) { http_response_code(404); die('الصفحة غير موجودة'); }
 
@@ -394,6 +399,7 @@ $branch_url = $branch['slug'];
     </style>
 </head>
 <body>
+<?= demo_banner_html() ?>
 
 <div class="progress-bar" id="progressBar"></div>
 
