@@ -171,9 +171,8 @@ if (!defined('PLAN_FEATURES')) {
             'ar', 'ratings', 'stats', 'reports',
             'branch_compare', 'advanced_fonts', 'priority_support',
             'orders', 'staff', 'coupons', 'offers',
-            // [removed] shamcash — تم إلغاء شام كاش
-            'multi_branch',
-            'direct_support', 'onboarding_training',
+            'shamcash', 'multi_branch',
+            'direct_support', 'onboarding_training', // ← بديل account_manager
         ],
     ]);
 }
@@ -206,20 +205,6 @@ if (!function_exists('restaurant_has_feature')) {
         }
         $plan = $cache[$rid];
         return in_array($feature, PLAN_FEATURES[$plan] ?? [], true);
-    }
-}
-
-/**
- * يعرض banner ثابت أعلى الصفحة في وضع الديمو.
- * يُستدعى عبر echo demo_banner_html() داخل <body> أو يُحقن تلقائياً في footer.
- */
-if (!function_exists('demo_banner_html')) {
-    function demo_banner_html(): string {
-        if (!defined('DEMO_MODE') || !DEMO_MODE) return '';
-        return '<div id="mp-demo-banner" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#FF6B35,#F59E0B);color:#fff;padding:8px 16px;font-family:Tajawal,Arial,sans-serif;font-size:13px;font-weight:700;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.25);">
-🎬 وضع تجريبي — الطلبات تتحرك تلقائياً كل 8 ثواني · تنحذف بعد 5 دقايق
-</div>
-<style>body{padding-top:36px !important;} #mp-demo-banner+*{margin-top:0;}</style>';
     }
 }
 

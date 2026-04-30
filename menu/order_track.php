@@ -1,7 +1,5 @@
-﻿<?php
-require_once __DIR__ . '/../bootstrap.php';
-
-use MenuPro\Helpers\DemoProgression;
+<?php
+require_once '../config/database.php';
 
 $slug     = $_GET['slug'] ?? '';
 $order_id = intval($_GET['id'] ?? 0);
@@ -15,11 +13,6 @@ $stmt = $pdo->prepare("SELECT o.* FROM orders o WHERE o.id=? AND o.restaurant_id
 $stmt->execute([$order_id, $restaurant['id']]);
 $order = $stmt->fetch();
 if(!$order) { http_response_code(404); die('الطلب غير موجود'); }
-
-// === Demo: lazy progression للطلبات + cleanup للقديمة ===
-DemoProgression::cleanupOldOrders($pdo, (int)$restaurant['id']);
-$order = DemoProgression::progressOrder($pdo, $order);
-
 $display_order_num = $order['branch_order_number'] ?? $order['restaurant_order_number'] ?? $order_id;
 
 // ===== العملة =====
@@ -283,7 +276,6 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
 </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <!-- HERO -->
 <div class="hero">

@@ -18,34 +18,6 @@ if(isset($_SESSION['staff_id'])) {
     header('Location: waiter.php'); exit;
 }
 
-// === Demo bypass: دخول staff ديمو سريع ===
-if (defined('DEMO_MODE') && DEMO_MODE && !empty($_GET['demo_role'])) {
-    $allowed = ['waiter', 'kitchen', 'cashier'];
-    $role = in_array($_GET['demo_role'], $allowed, true) ? $_GET['demo_role'] : 'waiter';
-
-    $st = $pdo->prepare("
-        SELECT s.id, s.restaurant_id, s.branch_id, s.role, s.username, r.name AS rest_name
-        FROM restaurant_staff s
-        JOIN restaurants r ON r.id = s.restaurant_id
-        WHERE r.slug = 'demo' AND r.is_demo = 1 AND s.role = ? AND s.is_active = 1
-        LIMIT 1
-    ");
-    $st->execute([$role]);
-    $staff = $st->fetch();
-
-    if ($staff) {
-        $_SESSION['staff_id']        = (int)$staff['id'];
-        $_SESSION['staff_role']      = $staff['role'];
-        $_SESSION['staff_rest_id']   = (int)$staff['restaurant_id'];
-        $_SESSION['staff_rest_name'] = $staff['rest_name'];
-        $_SESSION['staff_branch_id'] = (int)$staff['branch_id'];
-
-        if ($role === 'kitchen')  { header('Location: kitchen.php'); exit; }
-        if ($role === 'cashier')  { header('Location: cashier.php'); exit; }
-        header('Location: waiter.php'); exit;
-    }
-}
-
 $error = '';
 
 if($_SERVER['REQUEST_METHOD'] === 'POST') {

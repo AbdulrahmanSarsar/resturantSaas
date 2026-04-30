@@ -1,7 +1,5 @@
-﻿<?php
-require_once __DIR__ . '/../bootstrap.php';
-
-use MenuPro\Helpers\DemoProgression;
+<?php
+require_once '../config/database.php';
 
 $slug     = $_GET['slug']  ?? '';
 $order_id = intval($_GET['id'] ?? 0);
@@ -31,10 +29,6 @@ $order->execute([$order_id, $restaurant['id']]);
 $order = $order->fetch();
 if(!$order) die('الطلب غير موجود');
 
-// === Demo: lazy progression — يدفع الفاتورة لـ paid تلقائياً ===
-DemoProgression::cleanupOldOrders($pdo, (int)$restaurant['id']);
-$order = DemoProgression::progressOrder($pdo, $order);
-
 // ضرائب الطلب
 $order_taxes = [];
 if(!empty($order['tax_details'])) {
@@ -50,7 +44,12 @@ $items = $items->fetchAll();
 
 $primary   = '#FF6B35';
 $secondary = '#F7C59F';
-// [removed] شام كاش — الدفع نقدي للكاشير فقط حالياً
+// gate: ShamCash متاح فقط لو الباقة تدعمه (الاحترافية)
+$rid_for_plan     = (int)$order['restaurant_id'];
+$plan_has_sham    = restaurant_has_feature($rid_for_plan, 'shamcash');
+$shamcash_enabled = $plan_has_sham && !empty($restaurant['shamcash_enabled']);
+$shamcash_number  = $shamcash_enabled ? ($restaurant['shamcash_number'] ?? '') : '';
+$shamcash_qr      = $shamcash_enabled ? ($restaurant['shamcash_qr'] ?? '') : '';
 
 // ===== العملة =====
 $cur_symbol   = $restaurant['currency_symbol']   ?? '$';
@@ -196,7 +195,6 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
 </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <!-- HEADER -->
 <div class="inv-header">
@@ -339,7 +337,47 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
     <div class="ty-sub" id="tySub">نتمنى أن تكون تجربتك ممتازة<br>نراك قريباً في <?= htmlspecialchars($restaurant['name']) ?></div>
 </div>
 
-<!-- PAYMENT — نقدي فقط (شام كاش تم إلغاؤه) -->
+<!-- PAYMENT -->
+<?php if($shamcash_enabled && ($shamcash_number || $shamcash_qr)): ?>
+<div class="pay-card">
+    <div class="pay-card-title" id="lblPayment">طريقة الدفع</div>
+    <div class="pay-card-body">
+        <button class="pay-opt" id="btnCash" onclick="selectPay('cash')">
+            <div class="pay-opt-icon" style="background:rgba(34,197,94,.12);">💵</div>
+            <div>
+                <div class="pay-opt-title" id="cashTitle">دفع نقدي</div>
+                <div class="pay-opt-sub" id="cashSub">ادفع للنادل مباشرة</div>
+            </div>
+            <div class="pay-radio" id="checkCash"></div>
+        </button>
+        <button class="pay-opt" id="btnSham" onclick="selectPay('sham')">
+            <div class="pay-opt-icon" style="background:rgba(255,107,53,.12);">📱</div>
+            <div>
+                <div class="pay-opt-title" id="shamTitle">شام كاش</div>
+                <div class="pay-opt-sub" id="shamSub">دفع إلكتروني فوري</div>
+            </div>
+            <div class="pay-radio" id="checkSham"></div>
+        </button>
+    </div>
+    <div class="sham-details" id="shamDetails">
+        <div class="sham-send-lbl" id="sendAmountText">ارسل المبلغ لهذا الحساب</div>
+        <div class="sham-amount"><?= fmt_price($order['total_price'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
+        <?php if($shamcash_number): ?>
+        <div class="sham-num-row">
+            <div>
+                <div class="sham-num-lbl" id="accountText">رقم الحساب</div>
+                <div class="sham-num"><?= htmlspecialchars($shamcash_number) ?></div>
+            </div>
+            <button class="copy-btn" id="copyBtn" onclick="copyNumber('<?= htmlspecialchars($shamcash_number) ?>')">نسخ</button>
+        </div>
+        <?php endif; ?>
+        <?php if($shamcash_qr): ?>
+        <img src="<?= BASE_URL ?>/assets/uploads/shamcash/<?= htmlspecialchars($shamcash_qr) ?>" class="sham-qr">
+        <div class="sham-scan" id="scanText">امسح QR من تطبيق شام كاش</div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php else: ?>
 <div class="cash-only">
     <div class="cash-only-icon">💵</div>
     <div>
@@ -347,6 +385,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
         <div class="cash-only-sub" id="cashOnlySub">ادفع المبلغ للنادل مباشرة</div>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- ACTIONS -->
 <div class="inv-actions">
