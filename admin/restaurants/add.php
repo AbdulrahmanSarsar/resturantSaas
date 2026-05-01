@@ -133,7 +133,7 @@ input[type=radio].plan-opt:checked + .plan-lbl {
                     <div class="form-group">
                         <label>رابط المنيو *</label>
                         <input type="text" name="slug" id="slugInput" required placeholder="al-sham" oninput="updatePreview()">
-                        <div class="slug-preview">menu.almanarsoft.com/menu/<span id="slugShow">...</span></div>
+                        <div class="slug-preview">menu-pro.org/menu/<span id="slugShow">...</span></div>
                     </div>
                 </div>
                 <div class="form-row-2">

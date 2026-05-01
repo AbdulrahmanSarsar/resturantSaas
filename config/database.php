@@ -47,10 +47,10 @@ unset($__local_config, $__is_local);
 
 // defaults — بترتيب: local override → environment → production hardcoded
 if (!defined('DB_HOST'))  define('DB_HOST', 'localhost');
-if (!defined('DB_USER'))  define('DB_USER', 'u689381734_menu_database');
+if (!defined('DB_USER'))  define('DB_USER', 'u628425673_menu_database');
 if (!defined('DB_PASS'))  define('DB_PASS', '3Bood$@r$@r2006');
-if (!defined('DB_NAME'))  define('DB_NAME', 'u689381734_menu_database');
-if (!defined('BASE_URL')) define('BASE_URL', 'https://menu.almanarsoft.com');
+if (!defined('DB_NAME'))  define('DB_NAME', 'u628425673_menu_database');
+if (!defined('BASE_URL')) define('BASE_URL', 'https://menu-pro.org');
 
 try {
     $pdo = new PDO(
