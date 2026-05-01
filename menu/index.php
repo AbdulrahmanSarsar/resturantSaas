@@ -15,12 +15,30 @@ $table_from_qr = intval($_GET['table'] ?? 0);
 $slug          = $_GET['slug'] ?? '';
 $branch_slug   = $_GET['branch'] ?? '';
 
-// === Demo subdomain: لو ما في slug → redirect تلقائي لمطعم demo ===
+// === Demo subdomain: لو ما في slug → redirect لأول مطعم is_demo=1 ===
 if (!$slug && defined('DEMO_MODE') && DEMO_MODE) {
-    header('Location: ' . BASE_URL . '/menu/demo'); exit;
+    $demo_st = $pdo->prepare("SELECT slug FROM restaurants WHERE is_demo = 1 AND is_active = 1 ORDER BY id ASC LIMIT 1");
+    $demo_st->execute();
+    $demo_slug = $demo_st->fetchColumn();
+    if ($demo_slug) {
+        header('Location: ' . BASE_URL . '/menu/' . rawurlencode($demo_slug)); exit;
+    }
+    // ما في مطعم demo معرّف → عرض رسالة بسيطة
+    http_response_code(503);
+    die('وضع الديمو لم يُعدّ بعد. لم يتم تعيين is_demo=1 على أي مطعم.');
 }
 
 if(!$slug) { http_response_code(404); die('الصفحة غير موجودة'); }
+
+// === Demo subdomain: امنع الوصول لأي مطعم ليس is_demo=1 ===
+if (defined('DEMO_MODE') && DEMO_MODE) {
+    $check_demo = $pdo->prepare("SELECT is_demo FROM restaurants WHERE slug = ?");
+    $check_demo->execute([$slug]);
+    if (!$check_demo->fetchColumn()) {
+        http_response_code(404);
+        die('هذا المطعم غير متاح بوضع الديمو.');
+    }
+}
 
 // ===== جلب المطعم =====
 $stmt = $pdo->prepare("SELECT * FROM restaurants WHERE slug = ? AND is_active = 1");

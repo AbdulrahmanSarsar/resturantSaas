@@ -16,19 +16,7 @@ if(isset($_SESSION['restaurant_id'])) {
     header('Location: dashboard/index.php'); exit;
 }
 
-// === Demo bypass: دخول مباشر بدون credentials ===
-if (defined('DEMO_MODE') && DEMO_MODE && isset($_GET['demo_owner'])) {
-    $demo = $pdo->query("SELECT id, name, subscription_plan FROM restaurants WHERE slug='demo' AND is_demo=1 LIMIT 1")->fetch();
-    if ($demo) {
-        $_SESSION['restaurant_id']   = (int)$demo['id'];
-        $_SESSION['restaurant_name'] = $demo['name'];
-        $_SESSION['restaurant_plan'] = $demo['subscription_plan'];
-        $b = $pdo->prepare("SELECT id FROM branches WHERE restaurant_id=? AND is_active=1 ORDER BY id ASC LIMIT 1");
-        $b->execute([$demo['id']]);
-        $_SESSION['active_branch_id'] = (int)$b->fetchColumn();
-        header('Location: dashboard/index.php'); exit;
-    }
-}
+// [removed] demo bypass — الديمو يستخدم credentials حقيقية للمطعم
 
 $error = '';
 
@@ -248,19 +236,6 @@ input:focus { border-color: rgba(255,107,53,0.5); background: var(--bg4); box-sh
                 دخول للوحة التحكم
             </button>
         </form>
-
-        <div class="divider"><div class="divider-line"></div><div class="divider-text">أو</div><div class="divider-line"></div></div>
-
-        <?php if (defined('DEMO_MODE') && DEMO_MODE): ?>
-        <a href="?demo_owner=1" style="display:flex;align-items:center;justify-content:center;gap:9px;padding:14px;background:linear-gradient(90deg,#FF6B35,#F59E0B);color:#fff;border-radius:14px;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:14px;box-shadow:0 4px 18px rgba(255,107,53,.35);">
-            🎬 دخول كمالك ديمو
-        </a>
-        <div style="display:flex;gap:8px;margin-bottom:18px;">
-            <a href="staff/login.php?demo_role=waiter"  style="flex:1;padding:10px;background:rgba(59,130,246,.1);color:#3B82F6;border:1px solid rgba(59,130,246,.25);border-radius:11px;font-size:11px;font-weight:800;text-decoration:none;text-align:center;">نادل</a>
-            <a href="staff/login.php?demo_role=kitchen" style="flex:1;padding:10px;background:rgba(245,158,11,.1);color:#F59E0B;border:1px solid rgba(245,158,11,.25);border-radius:11px;font-size:11px;font-weight:800;text-decoration:none;text-align:center;">مطبخ</a>
-            <a href="staff/login.php?demo_role=cashier" style="flex:1;padding:10px;background:rgba(34,197,94,.1);color:#22C55E;border:1px solid rgba(34,197,94,.25);border-radius:11px;font-size:11px;font-weight:800;text-decoration:none;text-align:center;">كاشير</a>
-        </div>
-        <?php endif; ?>
 
         <a href="<?= defined('BASE_URL') ? BASE_URL : '/' ?>" class="back-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>

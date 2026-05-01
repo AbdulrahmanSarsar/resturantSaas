@@ -38,9 +38,10 @@ if ($__is_local) {
 }
 error_reporting(E_ALL);
 
-// تحميل override محلي إذا موجود (config/database.local.php) — مش commit للـ git
+// تحميل override من database.local.php إذا موجود — يشتغل بأي بيئة
+// (محلياً للتطوير + سيرفر الديمو لـ DB credentials منفصلة)
 $__local_config = __DIR__ . '/database.local.php';
-if ($__is_local && is_file($__local_config)) {
+if (is_file($__local_config)) {
     require $__local_config;
 }
 unset($__local_config, $__is_local);
