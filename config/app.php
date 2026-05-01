@@ -47,7 +47,7 @@ define('APP_ENV',      $env);
 define('APP_NAME',     'MenuPro');
 define('APP_VERSION',  '2.0.0');
 // BASE_URL متعرف بـ database.php — defined() check يمنع redeclare warning
-if (!defined('BASE_URL')) define('BASE_URL', getenv('BASE_URL') ?: 'https://menu.almanarsoft.com');
+if (!defined('BASE_URL')) define('BASE_URL', getenv('BASE_URL') ?: 'https://menu-pro.org');
 define('UPLOAD_DIR',   rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/') . '/assets/uploads/');
 
 // Security
