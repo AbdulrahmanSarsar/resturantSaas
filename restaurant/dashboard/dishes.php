@@ -39,8 +39,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if($_POST['action'] === 'add') {
-        $result = $dishService->create($rid, $_POST, $_FILES, $active_branch_id);
-        $success = $result['message'];
+        $dish_limit = plan_dish_limit();
+        $total_dishes = $pdo->prepare("SELECT COUNT(*) FROM dishes_v2 WHERE restaurant_id = ?");
+        $total_dishes->execute([$rid]);
+        if ($total_dishes->fetchColumn() >= $dish_limit) {
+            $success = '⚠️ وصلت للحد الأقصى (' . $dish_limit . ' أطباق) في الباقة المجانية. رقّي باقتك للمتابعة.';
+        } else {
+            $result = $dishService->create($rid, $_POST, $_FILES, $active_branch_id);
+            $success = $result['message'];
+        }
     }
 
     if($_POST['action'] === 'edit') {
@@ -73,6 +80,16 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $dishService->saveOptions(intval($_POST['dish_id']), $rid, $_POST['opt_groups'] ?? []);
         echo json_encode(['success'=>true]); exit;
     }
+}
+
+// حد الأطباق للباقة المجانية
+$dish_limit      = plan_dish_limit();
+$is_dish_limited = $dish_limit < PHP_INT_MAX;
+$total_dish_count = 0;
+if ($is_dish_limited) {
+    $cnt = $pdo->prepare("SELECT COUNT(*) FROM dishes_v2 WHERE restaurant_id = ?");
+    $cnt->execute([$rid]);
+    $total_dish_count = (int)$cnt->fetchColumn();
 }
 
 // فلتر
@@ -439,13 +456,36 @@ require_once 'sidebar.php';
     <div class="dishes-toolbar">
         <div>
             <div class="page-title">الأطباق</div>
-            <div class="page-subtitle"><?= count($dishes) ?> طبق مسجل</div>
+            <div class="page-subtitle">
+                <?= count($dishes) ?> طبق مسجل
+                <?php if($is_dish_limited): ?>
+                — <span style="color:<?= $total_dish_count >= $dish_limit ? '#EF4444' : 'var(--p)' ?>;font-weight:800;"><?= $total_dish_count ?>/<?= $dish_limit ?></span>
+                <?php endif; ?>
+            </div>
         </div>
+        <?php if($is_dish_limited && $total_dish_count >= $dish_limit): ?>
+        <a href="https://wa.me/963934609138?text=<?= rawurlencode('أريد ترقية باقتي من المجانية') ?>"
+           target="_blank" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 7 13 17 8 12 1 19"/><polyline points="17 7 23 7 23 13"/></svg>
+            رقّي للإضافة
+        </a>
+        <?php else: ?>
         <button class="btn btn-primary" onclick="openAddModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             إضافة طبق
         </button>
+        <?php endif; ?>
     </div>
+
+    <?php if($is_dish_limited): ?>
+    <div style="background:<?= $total_dish_count >= $dish_limit ? 'rgba(239,68,68,0.08)' : 'rgba(255,107,53,0.08)' ?>;border:1px solid <?= $total_dish_count >= $dish_limit ? 'rgba(239,68,68,0.2)' : 'rgba(255,107,53,0.18)' ?>;border-radius:14px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:<?= $total_dish_count >= $dish_limit ? '#EF4444' : 'var(--ink2)' ?>;">
+        <?php if($total_dish_count >= $dish_limit): ?>
+        🔒 وصلت للحد الأقصى في الباقة المجانية (10 أطباق). <a href="https://wa.me/963934609138?text=<?= rawurlencode('أريد ترقية باقتي من المجانية') ?>" target="_blank" style="color:var(--p);font-weight:800;text-decoration:underline;">رقّي الباقة</a> لإضافة المزيد.
+        <?php else: ?>
+        🆓 الباقة المجانية — <?= $dish_limit - $total_dish_count ?> أطباق متبقية من أصل <?= $dish_limit ?>.
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <?php if($success): ?>
     <div class="alert alert-success">

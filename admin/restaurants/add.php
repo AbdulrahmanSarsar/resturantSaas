@@ -167,7 +167,7 @@ input[type=radio].plan-opt:checked + .plan-lbl {
                 <div class="form-group">
                     <label>الباقة *</label>
                     <div class="plan-grid">
-                        <?php foreach(['basic'=>['🥉','أساسية','$80'],'advanced'=>['🥈','متقدمة','$180'],'premium'=>['⭐','بريميوم','$280']] as $pv=>[$pi,$pn,$pp]): ?>
+                        <?php foreach(['free'=>['🆓','مجانية','$0'],'basic'=>['🥉','أساسية','$15'],'advanced'=>['🥈','متقدمة','$20'],'premium'=>['⭐','بريميوم','$25']] as $pv=>[$pi,$pn,$pp]): ?>
                         <div>
                             <input type="radio" name="subscription_plan" value="<?= $pv ?>"
                                    id="p_<?= $pv ?>" class="plan-opt"

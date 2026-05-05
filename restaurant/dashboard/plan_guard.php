@@ -20,6 +20,9 @@
 // ===== تعريف الميزات لكل باقة =====
 if (!defined('PLAN_FEATURES')) {
     define('PLAN_FEATURES', [
+        'free' => [
+            'menu',          // منيو QR + حد أقصى 10 أطباق
+        ],
         'basic' => [
             'menu',          // منيو QR + أطباق + فئات (غير محدودة)
             'branding',      // تخصيص ألوان/شعار
@@ -66,12 +69,12 @@ if (!defined('PLAN_FEATURES')) {
 
 // ترتيب الباقات (للمقارنة)
 if (!defined('PLAN_RANK')) {
-    define('PLAN_RANK', ['basic' => 1, 'advanced' => 2, 'premium' => 3]);
+    define('PLAN_RANK', ['free' => 0, 'basic' => 1, 'advanced' => 2, 'premium' => 3]);
 }
 
 // أسعار شهرية (USD)
 if (!defined('PLAN_PRICES')) {
-    define('PLAN_PRICES', ['basic' => 15, 'advanced' => 20, 'premium' => 25]);
+    define('PLAN_PRICES', ['free' => 0, 'basic' => 15, 'advanced' => 20, 'premium' => 25]);
 }
 
 // أسعار سنوية (USD) — = 10 شهور (شهرين مجاناً)
@@ -81,7 +84,11 @@ if (!defined('PLAN_YEARLY_PRICES')) {
 
 // حد عدد الفروع لكل باقة
 if (!defined('PLAN_BRANCH_LIMITS')) {
-    define('PLAN_BRANCH_LIMITS', ['basic' => 1, 'advanced' => 1, 'premium' => PHP_INT_MAX]);
+    define('PLAN_BRANCH_LIMITS', ['free' => 1, 'basic' => 1, 'advanced' => 1, 'premium' => PHP_INT_MAX]);
+}
+
+if (!defined('PLAN_DISH_LIMITS')) {
+    define('PLAN_DISH_LIMITS', ['free' => 10]);
 }
 
 /**
@@ -105,6 +112,14 @@ function plan_has_feature(string $feature): bool {
 function plan_max_branches(): int {
     $plan = plan_current();
     return PLAN_BRANCH_LIMITS[$plan] ?? 1;
+}
+
+/**
+ * الحد الأقصى لعدد الأطباق (PHP_INT_MAX = لا حد)
+ */
+function plan_dish_limit(): int {
+    $plan = plan_current();
+    return PLAN_DISH_LIMITS[$plan] ?? PHP_INT_MAX;
 }
 
 /**
@@ -142,6 +157,7 @@ function plan_feature_required(string $feature): void {
  */
 function plan_show_upgrade_page(string $required, string $current): void {
     $plan_names = [
+        'free'     => '🆓 المجانية',
         'basic'    => '🟠 الأساسية',
         'advanced' => '🔴 المتقدمة',
         'premium'  => '👑 الاحترافية',

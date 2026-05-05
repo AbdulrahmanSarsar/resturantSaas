@@ -138,6 +138,7 @@ require_once '../sidebar.php';
         </div>
         <select name="plan" class="filter-select" onchange="this.form.submit()">
             <option value="all"      <?= $plan==='all'?'selected':'' ?>>كل الباقات</option>
+            <option value="free"     <?= $plan==='free'?'selected':'' ?>>مجانية</option>
             <option value="basic"    <?= $plan==='basic'?'selected':'' ?>>أساسية</option>
             <option value="advanced" <?= $plan==='advanced'?'selected':'' ?>>متقدمة</option>
             <option value="premium"  <?= $plan==='premium'?'selected':'' ?>>بريميوم</option>

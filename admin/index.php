@@ -9,6 +9,7 @@ $stats = $pdo->query("
         COUNT(*) as total,
         SUM(is_active=1) as active,
         SUM(is_active=0) as inactive,
+        SUM(subscription_plan='free') as free,
         SUM(subscription_plan='basic') as basic,
         SUM(subscription_plan='advanced') as advanced,
         SUM(subscription_plan='premium') as premium,
