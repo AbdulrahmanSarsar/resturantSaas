@@ -213,8 +213,8 @@ body{font-family:"Tajawal",sans-serif;background:#0C0C0C;color:#F0EBE3;min-heigh
 <div class="box">
 <div class="box-top">
 <div class="lock-icon">🔒</div>
-<div class="box-title">هاي الميزة محجوبة</div>
-<div class="box-sub">باقتك الحالية ما تتضمن هاد القسم<br>رقّي باقتك للوصول إليه</div>
+<div class="box-title">هذه الميزة محجوبة</div>
+<div class="box-sub">باقتك الحالية لا تتضمن هذا القسم<br>رقّي باقتك للوصول إليه</div>
 <div class="badge-wrap">
 <span class="badge badge-current">' . ($plan_names[$current] ?? $current) . '</span>
 <span class="badge-arrow">←</span>
@@ -230,7 +230,7 @@ body{font-family:"Tajawal",sans-serif;background:#0C0C0C;color:#F0EBE3;min-heigh
 <div class="price-num">$' . $price . '</div>
 <div class="price-period">/ شهر</div>
 </div>
-<a href="https://wa.me/963934609138?text=' . rawurlencode('بدي ارقّي باقتي إلى ' . ($plan_names[$required] ?? $required)) . '" class="upgrade-btn">📱 تواصل عبر واتساب للترقية</a>
+<a href="https://wa.me/963934609138?text=' . rawurlencode('أريد ترقية باقتي إلى ' . ($plan_names[$required] ?? $required)) . '" class="upgrade-btn">📱 تواصل عبر واتساب للترقية</a>
 <a href="javascript:history.back()" class="back-btn">← رجوع</a>
 </div>
 </div>

@@ -790,7 +790,7 @@ function updateGoCartBtn() {
 function launchAndroidAR() {
     const mv = document.getElementById('modelViewer');
     if(mv && mv.canActivateAR) mv.activateAR();
-    else showToast(currentLang==='en' ? '⚠️ AR not available on this device' : '⚠️ AR غير متاح على هاد الجهاز');
+    else showToast(currentLang==='en' ? '⚠️ AR not available on this device' : '⚠️ AR غير متاح على هذا الجهاز');
 }
 function showPhoto() {
     document.getElementById('modelViewer').style.display = 'none';

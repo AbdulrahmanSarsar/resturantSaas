@@ -1,7 +1,5 @@
-﻿<?php
-require_once __DIR__ . '/../bootstrap.php';
-
-use MenuPro\Helpers\DemoProgression;
+<?php
+require_once '../config/database.php';
 
 $slug     = $_GET['slug']  ?? '';
 $order_id = intval($_GET['id'] ?? 0);
@@ -30,10 +28,6 @@ $order = $pdo->prepare("SELECT * FROM orders WHERE id=? AND restaurant_id=?");
 $order->execute([$order_id, $restaurant['id']]);
 $order = $order->fetch();
 if(!$order) die('الطلب غير موجود');
-
-// === Demo: lazy progression — يدفع الفاتورة لـ paid تلقائياً ===
-DemoProgression::cleanupOldOrders($pdo, (int)$restaurant['id']);
-$order = DemoProgression::progressOrder($pdo, $order);
 
 // ضرائب الطلب
 $order_taxes = [];
@@ -196,7 +190,6 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
 </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <!-- HEADER -->
 <div class="inv-header">

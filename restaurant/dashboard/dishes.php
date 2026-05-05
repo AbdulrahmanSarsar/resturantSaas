@@ -506,7 +506,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
     <?php if(empty($dishes)): ?>
     <div class="dishes-empty">
         <div class="dishes-empty-icon">🍔</div>
-        <p>ما في أطباق بعد — أضف أول طبق!</p>
+        <p>لا توجد أطباق بعد — أضف أول طبق!</p>
     </div>
     <?php else: ?>
     <div class="dishes-grid">
@@ -826,7 +826,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
                     <div class="opts-body" id="optGroupsContainer">
                         <div class="opts-empty" id="optsEmpty">
                             <div style="font-size:28px;margin-bottom:8px;">🍕</div>
-                            ما في خيارات بعد<br>
+                            لا توجد خيارات بعد<br>
                             <span style="font-size:11px;">مثال: القياس، الإضافات، النكهة...</span>
                         </div>
                     </div>
@@ -899,7 +899,7 @@ if($last_reset !== $today && $sold_out_count > 0) {
         </div>
         <p style="color:var(--ink2);font-size:13px;margin-bottom:20px;line-height:1.8;">
             رح تحذف طبق "<strong id="deleteDishName" style="color:var(--ink)"></strong>".<br>
-            هاد الإجراء لا يمكن التراجع عنه.
+            هذا الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
             <?= csrf_field() ?>
@@ -938,7 +938,7 @@ function renderSuggList(excludeId, preSelected) {
 
     const available = ALL_DISHES.filter(d => d.id != excludeId);
     if(available.length === 0) {
-        list.innerHTML = '<div class="sugg-limit-note" style="padding:12px">ما في أطباق أخرى بعد</div>';
+        list.innerHTML = '<div class="sugg-limit-note" style="padding:12px">لا توجد أطباق أخرى بعد</div>';
         return;
     }
 
@@ -1124,7 +1124,7 @@ function loadOptions(groups) {
     if(!groups || groups.length === 0) {
         container.innerHTML = `<div class="opts-empty" id="optsEmpty">
             <div style="font-size:28px;margin-bottom:8px;">🍕</div>
-            ما في خيارات بعد<br>
+            لا توجد خيارات بعد<br>
             <span style="font-size:11px;">مثال: القياس، الإضافات، النكهة...</span>
         </div>`;
         saveWrap.style.display = 'none';
@@ -1255,7 +1255,7 @@ function checkEmpty() {
     if(container.querySelectorAll('.opt-group-card').length === 0) {
         container.innerHTML = `<div class="opts-empty" id="optsEmpty">
             <div style="font-size:28px;margin-bottom:8px;">🍕</div>
-            ما في خيارات بعد<br>
+            لا توجد خيارات بعد<br>
             <span style="font-size:11px;">مثال: القياس، الإضافات، النكهة...</span>
         </div>`;
         saveWrap.style.display = 'none';
@@ -1430,7 +1430,7 @@ function libLoadPhotos() {
     .then(r => r.json())
     .then(data => {
         if(data.error || !data.photos || data.photos.length === 0) {
-            grid.innerHTML = '<div class="lib-empty">😕 ما في نتائج — جرب كلمة ثانية</div>';
+            grid.innerHTML = '<div class="lib-empty">😕 لا توجد نتائج — جرب كلمة أخرى</div>';
             document.getElementById('libNextBtn').disabled = true;
             return;
         }

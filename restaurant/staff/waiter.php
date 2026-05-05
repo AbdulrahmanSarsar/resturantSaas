@@ -1,12 +1,10 @@
-﻿<?php
+<?php
 /**
  * waiter.php — Branch-scoped patch
  */
 session_start();
 require_once __DIR__ . '/../../bootstrap.php';
 require_once __DIR__ . '/../../config/csrf.php';
-
-use MenuPro\Helpers\DemoProgression;
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'waiter') {
     header('Location: login.php'); exit;
@@ -15,11 +13,8 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'waiter') {
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
 
-// gate: شاشة النادل ميزة المتقدمة + الاحترافية
+// gate: شاشة النادل ميزة الباقة الاحترافية فقط
 staff_feature_or_die($rid, 'staff', 'النادل — محجوب');
-
-// === Demo: cleanup للطلبات القديمة ===
-DemoProgression::cleanupOldOrders($pdo, $rid);
 
 // branch_id من الـ DB — محمي بـ try/catch لو العمود ما موجود بعد
 $branch_id   = null;
@@ -108,11 +103,6 @@ if($branch_id) {
     $orders_stmt->execute([$rid]);
 }
 $orders = $orders_stmt->fetchAll();
-
-// === Demo: lazy progression ===
-$orders = DemoProgression::progressMany($pdo, $rid, $orders);
-// Re-filter بعد التقدم
-$orders = array_values(array_filter($orders, fn($o) => in_array($o['status'], ['ready','preparing','confirmed','pending'])));
 
 // Batch-load order_items بدل N+1
 $items_by_order = [];
@@ -303,7 +293,6 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <div class="topbar">
     <div class="topbar-stripe"></div>
@@ -346,7 +335,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
     <?php if(empty($orders)): ?>
     <div class="empty">
         <span>✅</span>
-        <p>ما في طلبات نشطة الآن</p>
+        <p>لا توجد طلبات نشطة الآن</p>
     </div>
     <?php else: ?>
     <div class="section-head"><h2>الطلبات النشطة</h2></div>

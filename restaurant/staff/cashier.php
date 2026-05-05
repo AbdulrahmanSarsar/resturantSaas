@@ -1,12 +1,10 @@
-﻿<?php
+<?php
 /**
  * cashier.php — Branch-scoped patch
  */
 session_start();
 require_once __DIR__ . '/../../bootstrap.php';
 require_once __DIR__ . '/../../config/csrf.php';
-
-use MenuPro\Helpers\DemoProgression;
 
 if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'cashier') {
     header('Location: login.php'); exit;
@@ -15,19 +13,8 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'cashier') {
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
 
-// gate: شاشة الكاشير ميزة المتقدمة + الاحترافية
+// gate: شاشة الكاشير ميزة الباقة الاحترافية فقط
 staff_feature_or_die($rid, 'staff', 'الكاشير — محجوب');
-
-// === Demo: cleanup للطلبات القديمة + يدفع طلبات الـ delivered لـ paid ===
-DemoProgression::cleanupOldOrders($pdo, $rid);
-if (DemoProgression::isDemoRestaurant($pdo, $rid)) {
-    // جيب كل الطلبات النشطة وطبق progression
-    $all_active = $pdo->prepare("SELECT * FROM orders WHERE restaurant_id=? AND status NOT IN ('cancelled') AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
-    $all_active->execute([$rid]);
-    foreach ($all_active->fetchAll() as $o) {
-        DemoProgression::progressOrder($pdo, $o);
-    }
-}
 
 // branch_id من الـ DB — محمي بـ try/catch
 $branch_id   = null;
@@ -226,7 +213,6 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <div class="topbar">
     <div class="topbar-brand">

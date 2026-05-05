@@ -10,9 +10,7 @@
  * إذا الفرع غير محدد، يرجع كل طلبات المطعم (legacy behavior).
  */
 session_start();
-require_once __DIR__ . '/../../../bootstrap.php';
-
-use MenuPro\Helpers\DemoProgression;
+require_once '../../../config/database.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -33,16 +31,6 @@ if (isset($_SESSION['restaurant_id'])) {
 }
 
 $last_id = intval($_GET['last_id'] ?? 0);
-
-// === Demo: تحريك الطلبات النشطة + cleanup قبل الـ polling ===
-if (DemoProgression::isDemoRestaurant($pdo, (int)$rid)) {
-    DemoProgression::cleanupOldOrders($pdo, (int)$rid);
-    $active = $pdo->prepare("SELECT * FROM orders WHERE restaurant_id=? AND status NOT IN ('cancelled','paid') AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
-    $active->execute([$rid]);
-    foreach ($active->fetchAll() as $o) {
-        DemoProgression::progressOrder($pdo, $o);
-    }
-}
 
 // Branch filter helper
 $bf = $branch_id ? 'AND branch_id = ?' : '';

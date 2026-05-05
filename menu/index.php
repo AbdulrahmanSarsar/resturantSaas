@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * menu/index.php — صفحة المنيو (المرحلة 4 + 11)
  * 
@@ -23,7 +23,6 @@ if (!$slug && defined('DEMO_MODE') && DEMO_MODE) {
     if ($demo_slug) {
         header('Location: ' . BASE_URL . '/menu/' . rawurlencode($demo_slug)); exit;
     }
-    // ما في مطعم demo معرّف → عرض رسالة بسيطة
     http_response_code(503);
     die('وضع الديمو لم يُعدّ بعد. لم يتم تعيين is_demo=1 على أي مطعم.');
 }
@@ -417,7 +416,6 @@ $branch_url = $branch['slug'];
     </style>
 </head>
 <body>
-<?= demo_banner_html() ?>
 
 <div class="progress-bar" id="progressBar"></div>
 
@@ -553,7 +551,7 @@ $branch_url = $branch['slug'];
     <?php else: ?>
         <div class="no-results" id="noResults">
             <div class="no-results-box">🔍</div>
-            <p>ما في نتائج لبحثك</p>
+            <p>لا توجد نتائج لبحثك</p>
         </div>
 
         <?php if(!empty($active_offers)): ?>

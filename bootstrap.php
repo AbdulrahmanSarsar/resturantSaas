@@ -171,7 +171,7 @@ if (!defined('PLAN_FEATURES')) {
             'ar', 'ratings', 'stats', 'reports',
             'branch_compare', 'advanced_fonts', 'priority_support',
             'orders', 'staff', 'coupons', 'offers',
-            // [removed] shamcash — تم إلغاء شام كاش
+            // [removed] shamcash — تم إلغاء شام كاش بالكامل
             'multi_branch',
             'direct_support', 'onboarding_training',
         ],
@@ -210,20 +210,6 @@ if (!function_exists('restaurant_has_feature')) {
 }
 
 /**
- * يعرض banner ثابت أعلى الصفحة في وضع الديمو.
- * يُستدعى عبر echo demo_banner_html() داخل <body> أو يُحقن تلقائياً في footer.
- */
-if (!function_exists('demo_banner_html')) {
-    function demo_banner_html(): string {
-        if (!defined('DEMO_MODE') || !DEMO_MODE) return '';
-        return '<div id="mp-demo-banner" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#FF6B35,#F59E0B);color:#fff;padding:8px 16px;font-family:Tajawal,Arial,sans-serif;font-size:13px;font-weight:700;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.25);">
-🎬 وضع تجريبي — الطلبات تتحرك تلقائياً كل 8 ثواني · تنحذف بعد 5 دقايق
-</div>
-<style>body{padding-top:36px !important;} #mp-demo-banner+*{margin-top:0;}</style>';
-    }
-}
-
-/**
  * يطلق رسالة للموظف لو باقة المطعم ما تدعم ميزة الـ staff. أوقف التنفيذ.
  */
 if (!function_exists('staff_feature_or_die')) {
@@ -242,8 +228,8 @@ if (!function_exists('staff_feature_or_die')) {
         echo 'a.btn{display:block;padding:12px;background:#FF6B35;color:#fff;text-decoration:none;border-radius:12px;font-weight:800;}';
         echo '</style></head><body><div class="box">';
         echo '<div class="ic">🔒</div>';
-        echo '<h1>هاي الصفحة محجوبة</h1>';
-        echo '<p>صاحب المطعم لازم يرقّي الباقة إلى <b style="color:#FF6B35;">الاحترافية 👑</b><br>عشان تشتغل شاشات الموظفين (مطبخ / نادل / كاشير).</p>';
+        echo '<h1>هذه الصفحة محجوبة</h1>';
+        echo '<p>يجب على صاحب المطعم ترقية الباقة إلى <b style="color:#FF6B35;">الاحترافية 👑</b><br>لتعمل شاشات الموظفين (مطبخ / نادل / كاشير).</p>';
         echo '<a class="btn" href="login.php">رجوع لتسجيل الدخول</a>';
         echo '</div></body></html>';
         exit;

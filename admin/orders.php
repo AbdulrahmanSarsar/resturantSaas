@@ -187,7 +187,7 @@ require_once 'sidebar.php';
     <?php if(empty($orders)): ?>
         <div class="empty-state">
             <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg></div>
-            <p>ما في طلبات</p>
+            <p>لا توجد طلبات</p>
         </div>
     <?php else: ?>
     <?php

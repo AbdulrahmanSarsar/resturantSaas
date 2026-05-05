@@ -34,7 +34,7 @@ if (!restaurant_has_feature($rid, 'orders')) {
     echo 'a.btn{display:block;padding:11px;background:#FF6B35;color:#fff;text-decoration:none;border-radius:12px;font-weight:800;font-size:13px;}</style></head>';
     echo '<body><div class="box"><div class="ic">🍽️</div>';
     echo '<h1>الطلب الإلكتروني غير متاح</h1>';
-    echo '<p>هاد المطعم بيعرض المنيو فقط حالياً. للطلب، الرجاء التحدث مع النادل.</p>';
+    echo '<p>هذا المطعم يعرض القائمة فقط حالياً. للطلب، يرجى التحدث إلى النادل.</p>';
     echo '<a class="btn" href="/menu/' . urlencode($slug) . '/' . urlencode($branch_slug) . '">← العودة للمنيو</a>';
     echo '</div></body></html>';
     exit;
@@ -213,7 +213,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['items'])) {
         }
 
         if (empty($validated_items)) {
-            $error = 'ما في أطباق صالحة بالطلب';
+            $error = 'لا توجد أطباق صالحة في الطلب';
         } else {
             // ===== PASS 3: تحقّق الكوبون من DB =====
             $discount_amt = 0;
@@ -441,8 +441,8 @@ textarea.input-field{resize:none;height:82px;}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <div>
-                <div class="sugg-title" id="suggTitle">ممكن يعجبك كمان</div>
-                <div class="sugg-subtitle" id="suggSub">زباين طلبوا هالأطباق مع طلبك</div>
+                <div class="sugg-title" id="suggTitle">قد يعجبك أيضاً</div>
+                <div class="sugg-subtitle" id="suggSub">زبائن طلبوا هذه الأطباق مع طلبك</div>
             </div>
             <button class="sugg-close" onclick="closeSugg()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -575,8 +575,8 @@ const TR = {
         name_ph:'اسمك (اختياري)',notes_ph:'ملاحظات إضافية...',coupon_ph:'كود الخصم...',
         apply:'تطبيق',confirm_order:'تأكيد الطلب',sending:'جاري إرسال الطلب...',
         qr_auto:'تم تحديده تلقائياً من QR Code',add:'أضف للسلة',added:'تمت الإضافة!',
-        no_thanks:'لا شكراً، السلة كافية',you_may_like:'ممكن يعجبك كمان',
-        others_ordered:'زباين طلبوا هالأطباق مع طلبك',dir:'rtl',lang:'ar',
+        no_thanks:'لا شكراً، السلة كافية',you_may_like:'قد يعجبك أيضاً',
+        others_ordered:'زبائن طلبوا هذه الأطباق مع طلبك',dir:'rtl',lang:'ar',
     },
     en: {
         cart_title:'Your Cart',cart_empty:'Your cart is empty!',browse_menu:'Browse Menu',

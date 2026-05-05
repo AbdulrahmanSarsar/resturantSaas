@@ -433,7 +433,7 @@ $days_left = $expiry ? ceil((strtotime($expiry) - time()) / 86400) : 0;
             <?php if(empty($last_orders)): ?>
                 <div class="empty-state" style="padding:40px 20px;">
                     <div class="empty-state-icon">📋</div>
-                    <p>ما في طلبات بعد</p>
+                    <p>لا توجد طلبات بعد</p>
                 </div>
             <?php else:
                 $status_labels = [
