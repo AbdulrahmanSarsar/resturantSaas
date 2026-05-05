@@ -197,9 +197,9 @@ require_once 'sidebar.php';
         <div class="ratings-empty-icon">⭐</div>
         <p>
             <?php if($active_branch_name): ?>
-                ما في تقييمات لفرع <?= htmlspecialchars($active_branch_name) ?> بعد
+                لا توجد تقييمات لفرع <?= htmlspecialchars($active_branch_name) ?> بعد
             <?php else: ?>
-                ما في تقييمات بعد — شجع زبائنك على التقييم!
+                لا توجد تقييمات بعد — شجع زبائنك على التقييم!
             <?php endif; ?>
         </p>
     </div>
@@ -263,7 +263,7 @@ require_once 'sidebar.php';
     </form>
 
     <?php if(empty($ratings)): ?>
-    <div class="ratings-empty"><div class="ratings-empty-icon">🔍</div><p>ما في تقييمات بهاد الفلتر</p></div>
+    <div class="ratings-empty"><div class="ratings-empty-icon">🔍</div><p>لا توجد تقييمات بهذا الفلتر</p></div>
     <?php else: ?>
 
     <!-- أول 5 ظاهرة -->

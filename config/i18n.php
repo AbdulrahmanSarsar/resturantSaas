@@ -25,7 +25,7 @@ function get_translations() {
         'save'              => ['ar' => 'حفظ',               'en' => 'Save'],
         'cancel'            => ['ar' => 'إلغاء',             'en' => 'Cancel'],
         'search'            => ['ar' => 'ابحث عن طبق...',   'en' => 'Search for a dish...'],
-        'no_results'        => ['ar' => 'ما في نتائج لبحثك','en' => 'No results found'],
+        'no_results'        => ['ar' => 'لا توجد نتائج لبحثك','en' => 'No results found'],
         'all'               => ['ar' => 'الكل',              'en' => 'All'],
         'open'              => ['ar' => 'نقبل الطلبات',      'en' => 'Open Now'],
         'items'             => ['ar' => 'صنف',               'en' => 'items'],
@@ -66,8 +66,8 @@ function get_translations() {
         'sending'           => ['ar' => 'جاري إرسال الطلب...','en' => 'Sending order...'],
         'qr_auto'           => ['ar' => 'تم تحديده تلقائياً من QR Code', 'en' => 'Auto-detected from QR Code'],
         'no_thanks'         => ['ar' => 'لا شكراً، السلة كافية', 'en' => 'No thanks, continue'],
-        'you_may_like'      => ['ar' => 'ممكن يعجبك كمان',   'en' => 'You might also like'],
-        'others_ordered'    => ['ar' => 'زباين طلبوا هالأطباق مع طلبك', 'en' => 'Customers ordered these with their order'],
+        'you_may_like'      => ['ar' => 'قد يعجبك أيضاً',    'en' => 'You might also like'],
+        'others_ordered'    => ['ar' => 'زبائن طلبوا هذه الأطباق مع طلبك', 'en' => 'Customers ordered these with their order'],
 
         // ===== التتبع =====
         'track_order'       => ['ar' => 'تتبع طلب',          'en' => 'Track Order'],

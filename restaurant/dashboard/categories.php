@@ -306,7 +306,7 @@ require_once 'sidebar.php';
     <?php if(empty($cats)): ?>
         <div class="cats-empty">
             <div class="cats-empty-icon">📁</div>
-            <p>ما في تصنيفات بعد — أضف أول تصنيف!</p>
+            <p>لا توجد تصنيفات بعد — أضف أول تصنيف!</p>
         </div>
     <?php else: ?>
     <div class="cats-grid">
@@ -412,7 +412,7 @@ require_once 'sidebar.php';
         </div>
         <p style="color:var(--ink2);font-size:13px;margin-bottom:20px;line-height:1.8;">
             رح تحذف تصنيف "<strong id="deleteCatName" style="color:var(--ink)"></strong>".<br>
-            الأطباق المرتبطة بهاد التصنيف رح تبقى بس بدون تصنيف.
+            الأطباق المرتبطة بهذا التصنيف ستبقى ولكن بدون تصنيف.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
             <?= csrf_field() ?>

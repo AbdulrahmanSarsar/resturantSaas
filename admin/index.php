@@ -326,7 +326,7 @@ require_once 'sidebar.php';
             <?php if(empty($expiring)): ?>
                 <div class="empty-state" style="padding:40px 20px">
                     <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <p>ما في اشتراكات تنتهي قريباً</p>
+                    <p>لا توجد اشتراكات تنتهي قريباً</p>
                 </div>
             <?php else: ?>
                 <?php foreach($expiring as $e): ?>
@@ -358,7 +358,7 @@ require_once 'sidebar.php';
                             <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
                         </svg>
                     </div>
-                    <p>ما في مطاعم بعد</p>
+                    <p>لا توجد مطاعم بعد</p>
                 </div>
             <?php else: ?>
             <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">

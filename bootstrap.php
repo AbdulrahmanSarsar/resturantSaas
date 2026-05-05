@@ -228,8 +228,8 @@ if (!function_exists('staff_feature_or_die')) {
         echo 'a.btn{display:block;padding:12px;background:#FF6B35;color:#fff;text-decoration:none;border-radius:12px;font-weight:800;}';
         echo '</style></head><body><div class="box">';
         echo '<div class="ic">🔒</div>';
-        echo '<h1>هاي الصفحة محجوبة</h1>';
-        echo '<p>صاحب المطعم لازم يرقّي الباقة إلى <b style="color:#FF6B35;">الاحترافية 👑</b><br>عشان تشتغل شاشات الموظفين (مطبخ / نادل / كاشير).</p>';
+        echo '<h1>هذه الصفحة محجوبة</h1>';
+        echo '<p>يجب على صاحب المطعم ترقية الباقة إلى <b style="color:#FF6B35;">الاحترافية 👑</b><br>لتعمل شاشات الموظفين (مطبخ / نادل / كاشير).</p>';
         echo '<a class="btn" href="login.php">رجوع لتسجيل الدخول</a>';
         echo '</div></body></html>';
         exit;

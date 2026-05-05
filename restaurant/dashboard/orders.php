@@ -264,7 +264,7 @@ require_once 'sidebar.php';
 <?php if(empty($orders)): ?>
     <div class="orders-empty">
         <div class="orders-empty-icon">📋</div>
-        <p>ما في طلبات <?= $filter!=='all'?'بهاد الفلتر':'بعد' ?></p>
+        <p>لا توجد طلبات <?= $filter!=='all'?'بهذا الفلتر':'بعد' ?></p>
     </div>
 <?php else:
     $status_next = [

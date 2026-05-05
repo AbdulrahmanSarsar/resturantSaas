@@ -392,7 +392,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
             <?php elseif($order['status'] === 'preparing' && $time_remaining == 0): ?>
             <div class="prep-time-big">
                 <span class="prep-time-num" style="color:#22C55E;">🍽️</span>
-                <span class="prep-time-unit" id="prepReadySoon">طلبك على وشك يكون جاهز!</span>
+                <span class="prep-time-unit" id="prepReadySoon">طلبك على وشك أن يكون جاهزاً!</span>
             </div>
             <?php else: ?>
             <div class="prep-time-big">
@@ -618,7 +618,7 @@ function applyLang(l) {
         ptotal.textContent = l==='en' ? 'Total: '+totalNum+' min' : 'الإجمالي: '+totalNum+' دقيقة';
     }
     const pready = document.getElementById('prepReadySoon');
-    if(pready) pready.textContent = l==='en' ? 'Your order is almost ready!' : 'طلبك على وشك يكون جاهز!';
+    if(pready) pready.textContent = l==='en' ? 'Your order is almost ready!' : 'طلبك على وشك أن يكون جاهزاً!';
     const phint = document.getElementById('prepHint');
     if(phint) phint.textContent = l==='en' ? '⚡ Timer starts from order confirmation' : '⚡ يبدأ الحساب من لحظة تأكيد طلبك';
     const qtext = document.getElementById('queueText');
@@ -679,7 +679,7 @@ setTimeout(() => location.reload(), 10000);
         if(remaining <= 0) {
             countdownEl.textContent = '🍽️';
             const unitEl = document.getElementById('prepUnit');
-            if(unitEl) unitEl.textContent = lang==='en' ? 'Almost ready!' : 'على وشك يكون جاهز!';
+            if(unitEl) unitEl.textContent = lang==='en' ? 'Almost ready!' : 'على وشك أن يكون جاهزاً!';
         }
     }, 60000); // كل دقيقة
 })();

@@ -529,7 +529,7 @@ $branch_url = $branch['slug'];
     <?php else: ?>
         <div class="no-results" id="noResults">
             <div class="no-results-box">🔍</div>
-            <p>ما في نتائج لبحثك</p>
+            <p>لا توجد نتائج لبحثك</p>
         </div>
 
         <?php if(!empty($active_offers)): ?>

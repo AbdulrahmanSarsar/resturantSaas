@@ -334,7 +334,7 @@ require_once 'sidebar.php';
 <?php if(empty($taxes)): ?>
 <div class="empty-taxes">
     <div class="empty-taxes-icon">﹪</div>
-    <p style="font-size:14px;font-weight:600;color:var(--ink2);">ما في ضرائب بعد</p>
+    <p style="font-size:14px;font-weight:600;color:var(--ink2);">لا توجد ضرائب بعد</p>
     <p style="font-size:12px;color:var(--ink2);margin-top:5px;">أضف ضريبة القيمة المضافة أو رسوم الخدمة</p>
 </div>
 <?php else: ?>
@@ -457,7 +457,7 @@ require_once 'sidebar.php';
             <button class="modal-close" onclick="document.getElementById('deleteTaxModal').classList.remove('open')">✕</button>
         </div>
         <p style="color:var(--ink2);font-size:13px;margin-bottom:20px;line-height:1.8;">
-            رح تحذف ضريبة "<strong id="deleteTaxName" style="color:var(--ink)"></strong>". هاد الإجراء لا يمكن التراجع عنه.
+            سيتم حذف ضريبة "<strong id="deleteTaxName" style="color:var(--ink)"></strong>". هذا الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
             <?= csrf_field() ?>

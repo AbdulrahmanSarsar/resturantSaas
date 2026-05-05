@@ -232,7 +232,7 @@ require_once 'sidebar.php';
 <?php if(empty($offers)): ?>
 <div class="empty-state" style="background:var(--bg2);border:1px solid var(--line);border-radius:18px;">
     <div class="empty-state-icon">🎁</div>
-    <p>ما في عروض بعد — أضف أول عرض!</p>
+    <p>لا توجد عروض بعد — أضف أول عرض!</p>
 </div>
 <?php else: ?>
 <div class="offers-grid">
@@ -389,7 +389,7 @@ require_once 'sidebar.php';
             <button class="modal-close" onclick="document.getElementById('deleteOfferModal').classList.remove('open')">✕</button>
         </div>
         <p style="color:var(--ink2);font-size:13px;margin-bottom:20px;line-height:1.8;">
-            رح تحذف عرض "<strong id="deleteOfferName" style="color:var(--ink)"></strong>". هاد الإجراء لا يمكن التراجع عنه.
+            سيتم حذف عرض "<strong id="deleteOfferName" style="color:var(--ink)"></strong>". هذا الإجراء لا يمكن التراجع عنه.
         </p>
         <form method="POST" style="display:flex;gap:9px;">
             <?= csrf_field() ?>

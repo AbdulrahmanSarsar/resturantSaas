@@ -520,7 +520,7 @@ require_once 'sidebar.php';
     <?php if(empty($coupons)): ?>
     <div class="coup-empty">
         <div class="coup-empty-icon">🎟️</div>
-        <p>ما في كوبونات بعد — أضف أول كوبون خصم لزبائنك!</p>
+        <p>لا توجد كوبونات بعد — أضف أول كوبون خصم لزبائنك!</p>
     </div>
     <?php else: ?>
     <div class="coupons-grid">

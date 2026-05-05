@@ -335,7 +335,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
     <?php if(empty($orders)): ?>
     <div class="empty">
         <span>✅</span>
-        <p>ما في طلبات نشطة الآن</p>
+        <p>لا توجد طلبات نشطة الآن</p>
     </div>
     <?php else: ?>
     <div class="section-head"><h2>الطلبات النشطة</h2></div>

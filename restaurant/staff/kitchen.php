@@ -487,7 +487,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
     <?php if(empty($orders)): ?>
     <div class="empty">
         <span class="empty-icon">✅</span>
-        <div class="empty-text">ما في طلبات نشطة — استرح شوي!</div>
+        <div class="empty-text">لا توجد طلبات نشطة — استرح قليلاً!</div>
     </div>
     <?php else: ?>
     <div class="orders-grid" id="ordersGrid">

@@ -165,7 +165,7 @@ require_once '../sidebar.php';
                     <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
                 </svg>
             </div>
-            <p>ما في مطاعم</p>
+            <p>لا توجد مطاعم</p>
         </div>
     <?php else: ?>
         <?php foreach($restaurants as $idx => $r):
