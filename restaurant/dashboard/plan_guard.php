@@ -91,6 +91,10 @@ if (!defined('PLAN_DISH_LIMITS')) {
     define('PLAN_DISH_LIMITS', ['free' => 10]);
 }
 
+if (!defined('PLAN_CATEGORY_LIMITS')) {
+    define('PLAN_CATEGORY_LIMITS', ['free' => 3]);
+}
+
 /**
  * يرجع باقة الجلسة الحالية (basic لو مش معرّفة)
  */
@@ -120,6 +124,14 @@ function plan_max_branches(): int {
 function plan_dish_limit(): int {
     $plan = plan_current();
     return PLAN_DISH_LIMITS[$plan] ?? PHP_INT_MAX;
+}
+
+/**
+ * الحد الأقصى لعدد الفئات (PHP_INT_MAX = لا حد)
+ */
+function plan_category_limit(): int {
+    $plan = plan_current();
+    return PLAN_CATEGORY_LIMITS[$plan] ?? PHP_INT_MAX;
 }
 
 /**

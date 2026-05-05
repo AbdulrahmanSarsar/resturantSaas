@@ -19,6 +19,8 @@ $rid     = $_SESSION['restaurant_id'];
 $success = '';
 $error   = '';
 
+require_once __DIR__ . '/plan_guard.php';
+
 /** @var \MenuPro\Services\CategoryService $catService */
 $catService = service('category');
 
@@ -28,11 +30,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if($_POST['action'] === 'add') {
         $name = trim($_POST['name'] ?? '');
         if($name) {
-            try {
-                $catService->create($rid, $name, trim($_POST['name_en'] ?? ''), intval($_POST['sort_order'] ?? 0));
-                $success = 'تم إضافة التصنيف بنجاح!';
-            } catch(\Exception $e) {
-                $error = $e->getMessage();
+            $cat_limit = plan_category_limit();
+            $cnt_stmt = $pdo->prepare("SELECT COUNT(*) FROM categories_v2 WHERE restaurant_id = ?");
+            $cnt_stmt->execute([$rid]);
+            $current_count = (int)$cnt_stmt->fetchColumn();
+            if ($current_count >= $cat_limit) {
+                $error = '⚠️ وصلت للحد الأقصى (' . $cat_limit . ' فئات) في الباقة المجانية.';
+            } else {
+                try {
+                    $catService->create($rid, $name, trim($_POST['name_en'] ?? ''), intval($_POST['sort_order'] ?? 0));
+                    $success = 'تم إضافة التصنيف بنجاح!';
+                } catch(\Exception $e) {
+                    $error = $e->getMessage();
+                }
             }
         }
     }
@@ -59,7 +69,10 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     exit;
 }
 
-$cats = $catService->getAllForRestaurant($rid);
+$cats           = $catService->getAllForRestaurant($rid);
+$cat_limit      = plan_category_limit();
+$is_cat_limited = $cat_limit < PHP_INT_MAX;
+$total_cats     = count($cats);
 
 if(isset($_GET['msg']) && !$success && !$error) { $success = urldecode($_GET['msg']); }
 require_once 'sidebar.php';
@@ -253,13 +266,37 @@ require_once 'sidebar.php';
     <div class="cats-toolbar">
         <div>
             <div class="page-title">التصنيفات</div>
-            <div class="page-subtitle"><?= count($cats) ?> تصنيف مسجل</div>
+            <div class="page-subtitle">
+                <?= $total_cats ?> تصنيف مسجل
+                <?php if($is_cat_limited): ?>
+                    <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;margin-right:6px;
+                        <?= $total_cats >= $cat_limit
+                            ? 'background:rgba(239,68,68,0.12);color:#EF4444;border:1px solid rgba(239,68,68,0.2);'
+                            : 'background:rgba(255,107,53,0.10);color:var(--p);border:1px solid rgba(255,107,53,0.2);' ?>">
+                        <?= $total_cats ?>/<?= $cat_limit ?>
+                    </span>
+                <?php endif; ?>
+            </div>
         </div>
-        <button class="btn btn-primary" onclick="toggleAddForm()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            إضافة تصنيف
-        </button>
+        <?php if($is_cat_limited && $total_cats >= $cat_limit): ?>
+            <a href="https://wa.me/963934609138?text=<?= rawurlencode('أريد ترقية باقتي للحصول على فئات غير محدودة') ?>"
+               class="btn btn-primary" target="_blank">
+                ⬆️ ترقية للباقة الأساسية
+            </a>
+        <?php else: ?>
+            <button class="btn btn-primary" onclick="toggleAddForm()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                إضافة تصنيف
+            </button>
+        <?php endif; ?>
     </div>
+
+    <?php if($is_cat_limited && $total_cats >= $cat_limit): ?>
+    <div class="alert" style="max-width:100%;margin-bottom:18px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:13px 18px;display:flex;align-items:center;gap:10px;font-size:13px;color:#EF4444;font-weight:600;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        وصلت للحد الأقصى (<?= $cat_limit ?> فئات) في الباقة المجانية. رقّي للباقة الأساسية للحصول على فئات غير محدودة.
+    </div>
+    <?php endif; ?>
 
     <?php if($success): ?>
         <div class="alert alert-success">
