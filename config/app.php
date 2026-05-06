@@ -51,7 +51,7 @@ if (!defined('BASE_URL')) define('BASE_URL', getenv('BASE_URL') ?: 'https://menu
 define('UPLOAD_DIR',   rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/') . '/assets/uploads/');
 
 // Security
-define('SESSION_LIFETIME', 7200);  // 2 hours
+define('SESSION_LIFETIME', 2592000); // 30 days
 define('CSRF_TOKEN_NAME', '_csrf_token');
 
 // ============================================================

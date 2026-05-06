@@ -1,3 +1,7 @@
+# Session lifetime — 30 days (server + cookie)
+php_value session.gc_maxlifetime 2592000
+php_value session.cookie_lifetime 2592000
+
 RewriteEngine On
 
 # دعم UTF-8 للـ URLs العربية

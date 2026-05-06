@@ -39,7 +39,9 @@ class AuthMiddleware
             return;
         }
 
-        $lifetime = defined('SESSION_LIFETIME') ? SESSION_LIFETIME : 7200;
+        $lifetime = defined('SESSION_LIFETIME') ? SESSION_LIFETIME : 2592000;
+
+        ini_set('session.gc_maxlifetime', $lifetime);
 
         session_set_cookie_params([
             'lifetime' => $lifetime,
@@ -52,20 +54,13 @@ class AuthMiddleware
 
         session_start();
 
-        // Regenerate session ID periodically to prevent fixation
+        // Regenerate session ID every 24 hours (security without disrupting UX)
         if (!isset($_SESSION['_created'])) {
             $_SESSION['_created'] = time();
-        } elseif (time() - $_SESSION['_created'] > 1800) { // 30 min
+        } elseif (time() - $_SESSION['_created'] > 86400) {
             session_regenerate_id(true);
             $_SESSION['_created'] = time();
         }
-
-        // Session timeout
-        if (isset($_SESSION['_last_activity']) && (time() - $_SESSION['_last_activity'] > $lifetime)) {
-            $this->logout();
-            return;
-        }
-        $_SESSION['_last_activity'] = time();
 
         // Load current user from session
         if (isset($_SESSION['user_id'])) {
