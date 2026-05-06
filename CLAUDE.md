@@ -1,7 +1,7 @@
 # CLAUDE.md — MenuPro SaaS
 
 > **ملف السياق الرئيسي للمشروع.** Claude Code بيقراه تلقائياً ببداية كل جلسة.
-> آخر تحديث: 18 أبريل 2026
+> آخر تحديث: 7 مايو 2026
 
 ---
 
@@ -28,10 +28,10 @@
 **MenuPro** — منصة SaaS متعددة المستأجرين لمنيو رقمي للمطاعم، تستهدف السوق السوري.
 
 ### Links
-- **Domain:** `menu.almanarsoft.com`
-- **Demo live:** https://menu.almanarsoft.com/menu/flame-bites
-- **Dashboard:** https://menu.almanarsoft.com/restaurant/dashboard/
-- **Admin:** https://menu.almanarsoft.com/admin/
+- **Domain:** `menu-pro.org`
+- **Demo live:** https://menu-pro.org/menu/flame-bites
+- **Dashboard:** https://menu-pro.org/restaurant/dashboard/
+- **Admin:** https://menu-pro.org/admin/
 - **GitHub:** `AbdulrahmanSarsar/restaurantSaas` (main branch)
 
 ### Hosting & Stack

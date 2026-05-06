@@ -24,4 +24,4 @@ define('DB_PASS',  'YourStrongPassword123!');     // كلمة المرور
 define('DB_NAME',  'u000000000_your_db_name');   // اسم قاعدة البيانات
 
 // الرابط الأساسي للموقع (بدون trailing slash)
-define('BASE_URL', 'https://menu.almanarsoft.com');
+define('BASE_URL', 'https://menu-pro.org');

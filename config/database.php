@@ -1,7 +1,7 @@
 <?php
 // ===== Auto-detect environment (local dev vs production) =====
 // Local: HTTP_HOST = localhost / 127.0.0.1 → استخدم XAMPP defaults + override من .env.local
-// Production: HTTP_HOST = menu.almanarsoft.com → استخدم Hostinger
+// Production: HTTP_HOST = menu-pro.org → استخدم Hostinger
 $__is_local = (
     PHP_SAPI === 'cli-server' ||
     in_array(($_SERVER['HTTP_HOST'] ?? ''), ['localhost', '127.0.0.1'], true) ||
@@ -49,7 +49,7 @@ if (!defined('DB_HOST'))  define('DB_HOST',  'localhost');
 if (!defined('DB_USER'))  define('DB_USER',  '');
 if (!defined('DB_PASS'))  define('DB_PASS',  '');
 if (!defined('DB_NAME'))  define('DB_NAME',  '');
-if (!defined('BASE_URL')) define('BASE_URL', 'https://menu.almanarsoft.com');
+if (!defined('BASE_URL')) define('BASE_URL', 'https://menu-pro.org');
 
 try {
     $pdo = new PDO(
