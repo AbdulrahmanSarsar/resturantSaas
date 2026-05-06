@@ -1,26 +1,25 @@
 <?php
 /**
  * MenuPro — Price & Currency Helper
- * 
+ *
  * Single source of truth for all currency formatting.
- * Replaces the scattered fmt_price() / fmtPrice() definitions
- * that were duplicated across cart.php, invoice.php, reports.php, etc.
- * 
- * Usage:
- *   $price = new PriceHelper('ل.س', 'S.P', 0);
- *   echo $price->format(15000);       // "ل.س 15,000"
- *   echo $price->format(15000, 'en'); // "S.P 15,000"
- *   echo $price->jsFormatter();       // JS function for templates
+ * Uses bracket-style namespaces so the PriceHelper CLASS stays in
+ * MenuPro\Helpers (for the autoloader), while fmt_price() and
+ * load_branch_currency() land in the GLOBAL namespace so any page
+ * can call them without a namespace prefix.
  */
 
-namespace MenuPro\Helpers;
+// ============================================================
+// 1. Namespaced class (MenuPro\Helpers\PriceHelper)
+// ============================================================
+namespace MenuPro\Helpers {
 
 class PriceHelper
 {
     private string $symbolAr;
     private string $symbolEn;
     private int    $decimals;
-    
+
     // Symbols that go before the number (prefix currencies)
     private const PREFIX_SYMBOLS = ['$', '€', '₺', '£', '¥'];
 
@@ -48,21 +47,17 @@ class PriceHelper
 
     /**
      * Format a price amount with the appropriate currency symbol.
-     * 
-     * @param float|string $amount The price amount
-     * @param string       $lang   'ar' or 'en'
-     * @return string Formatted price string
      */
     public function format($amount, string $lang = 'ar'): string
     {
         $amount = floatval($amount);
         $symbol = ($lang === 'en') ? $this->symbolEn : $this->symbolAr;
         $formatted = number_format($amount, $this->decimals);
-        
+
         if ($this->isPrefix($symbol)) {
             return $symbol . $formatted;
         }
-        
+
         return $formatted . ' ' . $symbol;
     }
 
@@ -74,11 +69,11 @@ class PriceHelper
         $amount = round(floatval($amount));
         $symbol = ($lang === 'en') ? $this->symbolEn : $this->symbolAr;
         $formatted = number_format($amount, 0);
-        
+
         if ($this->isPrefix($symbol)) {
             return $symbol . $formatted;
         }
-        
+
         return $formatted . ' ' . $symbol;
     }
 
@@ -100,7 +95,6 @@ class PriceHelper
 
     /**
      * Generate a JavaScript function for client-side price formatting.
-     * Outputs a self-contained function that matches the PHP behavior.
      */
     public function jsFormatter(): string
     {
@@ -108,7 +102,7 @@ class PriceHelper
         $enSymbol = json_encode($this->symbolEn);
         $decimals = $this->decimals;
         $prefixes = json_encode(self::PREFIX_SYMBOLS);
-        
+
         return <<<JS
         function fmtPrice(amount, lang) {
             lang = lang || document.documentElement.lang || 'ar';
@@ -144,9 +138,20 @@ class PriceHelper
     }
 }
 
+} // end namespace MenuPro\Helpers
+
+
+// ============================================================
+// 2. Global functions (namespace \ — accessible from anywhere)
+// ============================================================
+namespace {
+
 /**
- * Global backward-compatible function.
+ * Global backward-compatible price formatter.
  * Maps to the old fmt_price() signature used across the codebase.
+ *
+ *   echo fmt_price(1500, 'ل.س', 0, false);  // "1,500 ل.س"
+ *   echo fmt_price(9.99, '$', 2, true);      // "$9.99"
  */
 if (!function_exists('fmt_price')) {
     function fmt_price($amount, $symbol = '$', $decimals = 2, $is_prefix = true): string
@@ -160,7 +165,6 @@ if (!function_exists('fmt_price')) {
  * جلب إعدادات العملة من branch_settings حسب branch_id.
  * يرجع مصفوفة جاهزة للاستخدام مع fmt_price().
  *
- * استخدام:
  *   $cur = load_branch_currency($pdo, $branch_id);
  *   echo fmt_price(1500, $cur['symbol'], $cur['decimals'], $cur['prefix']);
  */
@@ -199,3 +203,5 @@ if (!function_exists('load_branch_currency')) {
         return $result;
     }
 }
+
+} // end namespace (global)
