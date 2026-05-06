@@ -43,13 +43,6 @@ $cur_symbol_en = $cur['symbol_en'];
 $cur_decimals  = $cur['decimals'];
 $cur_prefix    = $cur['prefix'];
 
-$shamcash_enabled = false;
-if ($branch_id) {
-    $sc = $pdo->prepare("SELECT shamcash_enabled FROM branch_settings WHERE branch_id = ? LIMIT 1");
-    $sc->execute([$branch_id]);
-    $shamcash_enabled = (bool)($sc->fetchColumn());
-}
-
 // اسم المطعم من الـ session (يُعيّنه AuthMiddleware عند تسجيل الدخول)
 $rest_name = $_SESSION['staff_rest_name'] ?? '';
 
@@ -57,7 +50,7 @@ $rest_name = $_SESSION['staff_rest_name'] ?? '';
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['ajax'])) {
     csrf_require();
     $order_id = intval($_POST['order_id']);
-    $method   = in_array($_POST['method'],['cash','card','shamcash']) ? $_POST['method'] : 'cash';
+    $method   = in_array($_POST['method'],['cash','card']) ? $_POST['method'] : 'cash';
     $chk = $pdo->prepare("SELECT id FROM orders WHERE id=? AND restaurant_id=? AND status='delivered' AND payment_status='unpaid'");
     $chk->execute([$order_id, $rid]);
     if($chk->fetch()) {
@@ -124,8 +117,8 @@ $today_stats = $pdo->prepare("
         COALESCE(SUM(CASE WHEN payment_method='cash' THEN total_price END),0) as cash_revenue,
         SUM(payment_method='card') as card_count,
         COALESCE(SUM(CASE WHEN payment_method='card' THEN total_price END),0) as card_revenue,
-        SUM(payment_method='shamcash') as sham_count,
-        COALESCE(SUM(CASE WHEN payment_method='shamcash' THEN total_price END),0) as sham_revenue
+        0 as sham_count,
+        0 as sham_revenue
     FROM orders
     WHERE restaurant_id=? $stats_branch_sql AND payment_status='paid' AND DATE(paid_at)=CURDATE()
 ");
@@ -200,7 +193,6 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 .pay-btn:hover{transform:translateY(-2px);}
 .pay-btn.cash:hover,.pay-btn.cash.selected{border-color:#22C55E;background:rgba(34,197,94,.1);color:#22C55E;}
 .pay-btn.card:hover,.pay-btn.card.selected{border-color:#3B82F6;background:rgba(59,130,246,.1);color:#3B82F6;}
-.pay-btn.shamcash:hover,.pay-btn.shamcash.selected{border-color:#FF6B35;background:rgba(255,107,53,.1);color:#FF6B35;}
 .pay-btn-icon{font-size:20px;}
 .confirm-btn{width:100%;margin-top:10px;padding:13px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s;opacity:.5;pointer-events:none;}
 .confirm-btn.ready{opacity:1;pointer-events:all;}
@@ -255,8 +247,8 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
             <div class="stat-val"><?= fmt_price($stats['cash_revenue'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">💳 كارت / شام كاش</div>
-            <div class="stat-val blue"><?= fmt_price($stats['card_revenue'] + $stats['sham_revenue'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
+            <div class="stat-label">💳 كارت</div>
+            <div class="stat-val blue"><?= fmt_price($stats['card_revenue'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
         </div>
     </div>
 
@@ -303,12 +295,6 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
                     <span class="pay-btn-icon">💳</span>
                     كارت
                 </button>
-                <?php if($shamcash_enabled): ?>
-                <button class="pay-btn shamcash" onclick="selectMethod(this,'shamcash',<?= $o['id'] ?>)">
-                    <span class="pay-btn-icon">📱</span>
-                    شام كاش
-                </button>
-                <?php endif; ?>
             </div>
             <button class="confirm-btn" id="cb-<?= $o['id'] ?>" onclick="confirmPay(<?= $o['id'] ?>)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>

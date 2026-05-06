@@ -37,10 +37,8 @@ $today = $pdo->prepare("
         COALESCE(SUM(total_price),0) as revenue,
         COALESCE(SUM(CASE WHEN payment_method='cash' THEN total_price END),0) as cash,
         COALESCE(SUM(CASE WHEN payment_method='card' THEN total_price END),0) as card,
-        COALESCE(SUM(CASE WHEN payment_method='shamcash' THEN total_price END),0) as shamcash,
         COUNT(CASE WHEN payment_method='cash' THEN 1 END) as cash_count,
         COUNT(CASE WHEN payment_method='card' THEN 1 END) as card_count,
-        COUNT(CASE WHEN payment_method='shamcash' THEN 1 END) as sham_count,
         SUM(CASE WHEN payment_status='unpaid' AND status='delivered' THEN 1 ELSE 0 END) as unpaid_count,
         COALESCE(SUM(CASE WHEN payment_status='unpaid' AND status='delivered' THEN total_price END),0) as unpaid_revenue
     FROM orders WHERE restaurant_id=? $bf AND DATE(created_at)=CURDATE()
@@ -70,8 +68,7 @@ $monthly = $pdo->prepare("
         COUNT(*) as orders,
         COALESCE(SUM(total_price),0) as revenue,
         COALESCE(SUM(CASE WHEN payment_method='cash' THEN total_price END),0) as cash,
-        COALESCE(SUM(CASE WHEN payment_method='card' THEN total_price END),0) as card,
-        COALESCE(SUM(CASE WHEN payment_method='shamcash' THEN total_price END),0) as shamcash
+        COALESCE(SUM(CASE WHEN payment_method='card' THEN total_price END),0) as card
     FROM orders
     WHERE restaurant_id=? $bf AND payment_status='paid' AND created_at >= DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
     GROUP BY DATE_FORMAT(created_at,'%Y-%m')
@@ -200,11 +197,6 @@ require_once 'sidebar.php';
         <div class="rcard-val b"><?= fmt_price($td['card'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
         <div class="rcard-sub"><?= $td['card_count'] ?> طلب</div>
     </div>
-    <div class="rcard">
-        <div class="rcard-label">📱 شام كاش</div>
-        <div class="rcard-val" style="color:#FF6B35"><?= fmt_price($td['shamcash'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
-        <div class="rcard-sub"><?= $td['sham_count'] ?> طلب</div>
-    </div>
     <?php if($td['unpaid_count'] > 0): ?>
     <div class="rcard" style="border-color:rgba(239,68,68,.25);">
         <div class="rcard-label">⚠️ غير مقبوض</div>
@@ -278,7 +270,6 @@ foreach($daily_data as $d) $daily_map[$d['day']] = $d;
                 <th>إيرادات</th>
                 <th>نقدي</th>
                 <th>كارت</th>
-                <th>شام كاش</th>
             </tr>
         </thead>
         <tbody>
@@ -289,7 +280,6 @@ foreach($daily_data as $d) $daily_map[$d['day']] = $d;
             <td><strong style="color:var(--p)"><?= fmt_price($m['revenue'], $cur_symbol, $cur_decimals, $cur_prefix) ?></strong></td>
             <td><?= fmt_price($m['cash'], $cur_symbol, $cur_decimals, $cur_prefix) ?></td>
             <td><?= fmt_price($m['card'], $cur_symbol, $cur_decimals, $cur_prefix) ?></td>
-            <td><?= fmt_price($m['shamcash'], $cur_symbol, $cur_decimals, $cur_prefix) ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>

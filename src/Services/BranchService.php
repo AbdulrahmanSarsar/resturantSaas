@@ -38,8 +38,6 @@ class BranchService
                 bs.currency_decimals,
                 bs.welcome_message,
                 bs.welcome_message_en,
-                bs.shamcash_enabled,
-                bs.shamcash_number,
                 (SELECT COUNT(*) 
                    FROM restaurant_staff rs 
                    WHERE rs.branch_id = b.id 
@@ -70,8 +68,7 @@ class BranchService
                 b.restaurant_id, b.name, b.name_en, b.slug, b.address, b.phone,
                 b.is_active, b.created_at,
                 bs.currency_code, bs.currency_symbol, bs.currency_symbol_en,
-                bs.currency_decimals, bs.welcome_message, bs.welcome_message_en,
-                bs.shamcash_enabled, bs.shamcash_number
+                bs.currency_decimals, bs.welcome_message, bs.welcome_message_en
             FROM branches b
             LEFT JOIN branch_settings bs ON bs.branch_id = b.id
             WHERE b.id = ? AND b.restaurant_id = ?
@@ -92,8 +89,7 @@ class BranchService
                 b.restaurant_id, b.name, b.name_en, b.slug, b.address, b.phone,
                 b.is_active, b.created_at,
                 bs.currency_code, bs.currency_symbol, bs.currency_symbol_en,
-                bs.currency_decimals, bs.welcome_message, bs.welcome_message_en,
-                bs.shamcash_enabled, bs.shamcash_number
+                bs.currency_decimals, bs.welcome_message, bs.welcome_message_en
             FROM branches b
             LEFT JOIN branch_settings bs ON bs.branch_id = b.id
             WHERE b.restaurant_id = ? AND b.slug = ? AND b.is_active = 1
@@ -146,11 +142,10 @@ class BranchService
 
             if ($existing) {
                 $this->db->prepare("
-                    INSERT INTO branch_settings 
-                        (branch_id, currency_code, currency_symbol, currency_symbol_en, 
-                         currency_decimals, welcome_message, welcome_message_en, 
-                         shamcash_enabled, shamcash_number)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO branch_settings
+                        (branch_id, currency_code, currency_symbol, currency_symbol_en,
+                         currency_decimals, welcome_message, welcome_message_en)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ")->execute([
                     $branchId,
                     $existing['currency_code']       ?? 'SYP',
@@ -159,8 +154,6 @@ class BranchService
                     $existing['currency_decimals']   ?? 0,
                     $existing['welcome_message']     ?? '',
                     $existing['welcome_message_en']  ?? '',
-                    $existing['shamcash_enabled']    ?? 0,
-                    $existing['shamcash_number']     ?? '',
                 ]);
             } else {
                 $this->db->prepare("
@@ -203,8 +196,7 @@ class BranchService
         $this->db->prepare("
             UPDATE branch_settings SET
                 currency_code = ?, currency_symbol = ?, currency_symbol_en = ?,
-                currency_decimals = ?, welcome_message = ?, welcome_message_en = ?,
-                shamcash_enabled = ?, shamcash_number = ?
+                currency_decimals = ?, welcome_message = ?, welcome_message_en = ?
             WHERE branch_id = ?
         ")->execute([
             trim($data['currency_code']      ?? 'SYP'),
@@ -213,8 +205,6 @@ class BranchService
             intval($data['currency_decimals'] ?? 0),
             trim($data['welcome_message']    ?? ''),
             trim($data['welcome_message_en'] ?? ''),
-            isset($data['shamcash_enabled']) ? 1 : 0,
-            trim($data['shamcash_number']    ?? ''),
             $branchId
         ]);
         return true;

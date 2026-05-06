@@ -29,14 +29,27 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
     $twitter         = trim($_POST['twitter']         ?? '');
     $tiktok          = trim($_POST['tiktok']          ?? '');
 
-    // رفع شعار
+    // رفع شعار — مع التحقق من النوع الحقيقي للملف (MIME + getimagesize)
     $logo = $restaurant['logo'];
-    if(!empty($_FILES['logo']['name'])) {
-        $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
-        if(in_array($ext, ['jpg','jpeg','png','webp'])) {
-            if($logo) @unlink('../../assets/uploads/' . $logo);
-            $logo = 'logos/' . uniqid() . '.' . $ext;
-            move_uploaded_file($_FILES['logo']['tmp_name'], '../../assets/uploads/' . $logo);
+    if(!empty($_FILES['logo']['name']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+        $tmp  = $_FILES['logo']['tmp_name'];
+        $ext  = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
+        $allowed_exts  = ['jpg','jpeg','png','webp'];
+        $allowed_mimes = ['image/jpeg','image/png','image/webp','image/gif'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $tmp);
+        finfo_close($finfo);
+        $img_ok = @getimagesize($tmp) !== false;
+        if(in_array($ext, $allowed_exts, true) && in_array($mime, $allowed_mimes, true) && $img_ok) {
+            $logos_dir = __DIR__ . '/../../assets/uploads/logos/';
+            if(!is_dir($logos_dir)) mkdir($logos_dir, 0755, true);
+            // htaccess guard — منع تنفيذ أي سكريبت بمجلد الصور
+            $guard = $logos_dir . '.htaccess';
+            if(!file_exists($guard)) file_put_contents($guard, "Options -ExecCGI\nAddHandler cgi-script .php .pl .py .sh\nphp_flag engine off\n<FilesMatch \"\\.php$\">\n  Require all denied\n</FilesMatch>\n");
+            if($logo) { $old = __DIR__ . '/../../assets/uploads/' . basename($logo); if(file_exists($old)) @unlink($old); }
+            $new_name = 'logos/' . bin2hex(random_bytes(12)) . '.' . $ext;
+            move_uploaded_file($tmp, __DIR__ . '/../../assets/uploads/' . $new_name);
+            $logo = $new_name;
         }
     }
 
@@ -51,21 +64,6 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
     }
 
     if(!$error) {
-        // شام كاش
-        $shamcash_enabled = isset($_POST['shamcash_enabled']) ? 1 : 0;
-        $shamcash_number  = trim($_POST['shamcash_number'] ?? '');
-        $shamcash_qr      = $restaurant['shamcash_qr'] ?? '';
-        if(!empty($_FILES['shamcash_qr']['name']) && $_FILES['shamcash_qr']['error'] === UPLOAD_ERR_OK) {
-            $ext = strtolower(pathinfo($_FILES['shamcash_qr']['name'], PATHINFO_EXTENSION));
-            if(in_array($ext, ['jpg','jpeg','png','webp'])) {
-                $qr_dir = rtrim($_SERVER['DOCUMENT_ROOT'],'/') . '/assets/uploads/shamcash/';
-                if(!is_dir($qr_dir)) mkdir($qr_dir, 0755, true);
-                if($shamcash_qr && file_exists($qr_dir.$shamcash_qr)) @unlink($qr_dir.$shamcash_qr);
-                $shamcash_qr = uniqid('sc_',true).'.'.$ext;
-                move_uploaded_file($_FILES['shamcash_qr']['tmp_name'], $qr_dir.$shamcash_qr);
-            }
-        }
-
         $currency_code      = trim($_POST['currency_code']      ?? 'USD');
         $currency_symbol    = trim($_POST['currency_symbol']    ?? '$');
         $currency_symbol_en = trim($_POST['currency_symbol_en'] ?? '$');
@@ -75,14 +73,12 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
             name=?, phone=?, address=?, logo=?,
             welcome_message=?, welcome_message_en=?,
             instagram=?, facebook=?, whatsapp=?, twitter=?, tiktok=?,
-            shamcash_enabled=?, shamcash_number=?, shamcash_qr=?,
             currency_code=?, currency_symbol=?, currency_symbol_en=?, currency_decimals=?
             WHERE id=?")
             ->execute([
                 $name, $phone, $address, $logo,
                 $welcome_message, $welcome_message_en,
                 $instagram, $facebook, $whatsapp, $twitter, $tiktok,
-                $shamcash_enabled, $shamcash_number, $shamcash_qr,
                 $currency_code, $currency_symbol, $currency_symbol_en, $currency_decimals,
                 $rid
             ]);
@@ -536,38 +532,6 @@ input[type=color] {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         عرض المنيو
                     </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- شام كاش -->
-        <div class="fc full">
-            <div class="fc-head">
-                <div class="fc-head-icon" style="background:rgba(255,107,53,0.12);color:#FF6B35">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                </div>
-                <span class="fc-title">شام كاش</span>
-            </div>
-            <div class="fc-body">
-                <div class="form-group">
-                    <label class="check-wrap">
-                        <input type="checkbox" name="shamcash_enabled" <?= !empty($restaurant['shamcash_enabled'])?'checked':'' ?>>
-                        <span>تفعيل خيار الدفع بشام كاش للزبائن</span>
-                    </label>
-                </div>
-                <div class="form-group">
-                    <label>رقم حساب شام كاش</label>
-                    <input type="text" name="shamcash_number" value="<?= htmlspecialchars($restaurant['shamcash_number']??'') ?>" placeholder="09xxxxxxxx">
-                </div>
-                <div class="form-group">
-                    <label>صورة QR كود شام كاش</label>
-                    <?php if(!empty($restaurant['shamcash_qr'])): ?>
-                    <div class="logo-preview-row">
-                        <img src="<?= BASE_URL ?>/assets/uploads/shamcash/<?= $restaurant['shamcash_qr'] ?>" style="border-radius:8px;">
-                        <span>QR الحالي</span>
-                    </div>
-                    <?php endif; ?>
-                    <input type="file" name="shamcash_qr" accept="image/*">
                 </div>
             </div>
         </div>

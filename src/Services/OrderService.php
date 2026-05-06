@@ -352,13 +352,13 @@ class OrderService
      * Record payment for a delivered order.
      * 
      * @param int    $orderId  Order ID
-     * @param string $method   Payment method (cash, card, shamcash)
+     * @param string $method   Payment method (cash, card)
      * @param int    $cashierId Cashier user ID
      * @return bool Success
      */
     public function recordPayment(int $orderId, string $method, int $cashierId): bool
     {
-        $validMethods = ['cash', 'card', 'shamcash'];
+        $validMethods = ['cash', 'card'];
         if (!in_array($method, $validMethods, true)) {
             throw new \InvalidArgumentException('Invalid payment method: ' . $method);
         }
