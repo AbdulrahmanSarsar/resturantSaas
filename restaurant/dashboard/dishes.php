@@ -20,6 +20,11 @@ $rid     = $_SESSION['restaurant_id'];
 $active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $success = '';
 
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
+
 /** @var \MenuPro\Services\DishService $dishService */
 $dishService = service('dish');
 
@@ -589,9 +594,9 @@ if($last_reset !== $today && $sold_out_count > 0) {
                         $final_p = ($disc_a && $disc_p > 0) ? $d['price'] * (1 - $disc_p/100) : $d['price'];
                         ?>
                         <?php if($disc_a && $disc_p > 0): ?>
-                        <div class="dish-price-old">$<?= number_format($d['price'],2) ?></div>
+                        <div class="dish-price-old"><?= fmt_price($d['price'], $cur_symbol, $cur_dec, $cur_pfx) ?></div>
                         <?php endif; ?>
-                        <div class="dish-price">$<?= number_format($final_p,2) ?></div>
+                        <div class="dish-price"><?= fmt_price($final_p, $cur_symbol, $cur_dec, $cur_pfx) ?></div>
                     </div>
                 </div>
                 <?php if($d['description']): ?>

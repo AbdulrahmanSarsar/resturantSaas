@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once __DIR__ . '/../../src/Helpers/PriceHelper.php';
 
 if(!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
@@ -13,6 +14,12 @@ $active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $bf  = $active_branch_id ? 'AND branch_id = ?'    : '';
 $bfo = $active_branch_id ? 'AND o.branch_id = ?'  : '';
 $bp  = $active_branch_id ? [$active_branch_id]    : [];
+
+// ===== Currency =====
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
 
 // ===== Stats =====
 // dishes/categories على مستوى المطعم (مش الفرع — حسب ADR-003)
@@ -375,7 +382,7 @@ $days_left = $expiry ? ceil((strtotime($expiry) - time()) / 86400) : 0;
                     <?= $rev_change >= 0 ? '↑' : '↓' ?> <?= abs($rev_change) ?>%
                 </div>
             </div>
-            <div class="kpi-val">$<?= number_format($today_revenue, 0) ?></div>
+            <div class="kpi-val"><?= fmt_price($today_revenue, $cur_symbol, 0, $cur_pfx) ?></div>
             <div class="kpi-label">إيرادات اليوم</div>
             <div class="sparkline-wrap" id="spark"></div>
         </div>
@@ -453,7 +460,7 @@ $days_left = $expiry ? ceil((strtotime($expiry) - time()) / 86400) : 0;
                     <?php else: ?>
                         <div class="order-name" style="flex:1;"></div>
                     <?php endif; ?>
-                    <div class="order-price">$<?= number_format($o['total_price'], 2) ?></div>
+                    <div class="order-price"><?= fmt_price($o['total_price'], $cur_symbol, $cur_dec, $cur_pfx) ?></div>
                     <span class="badge badge-<?= $o['status'] ?>"><?= $status_labels[$o['status']] ?></span>
                     <div class="order-time"><?= date('H:i', strtotime($o['created_at'])) ?></div>
                 </div>

@@ -20,6 +20,12 @@ $bf  = $active_branch_id ? "AND branch_id = ?"    : "";
 $bfo = $active_branch_id ? "AND o.branch_id = ?"  : "";
 $bp  = $active_branch_id ? [$active_branch_id]     : [];
 
+// ===== Currency =====
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
+
 // ===== General =====
 $general = $pdo->prepare("
     SELECT
@@ -460,7 +466,7 @@ require_once 'sidebar.php';
             <div class="kpi-icon-box" style="background:rgba(34,197,94,0.12);color:#22C55E">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             </div>
-            <div class="kpi-val">$<?= number_format($general['total_revenue'], 0) ?></div>
+            <div class="kpi-val"><?= fmt_price($general['total_revenue'], $cur_symbol, 0, $cur_pfx) ?></div>
             <div class="kpi-lbl">إجمالي الإيرادات</div>
             <div class="kpi-chg <?= $revenue_change >= 0 ? 'chg-up' : 'chg-down' ?>">
                 <?= $revenue_change >= 0 ? '↑' : '↓' ?> <?= abs($revenue_change) ?>%
@@ -471,7 +477,7 @@ require_once 'sidebar.php';
             <div class="kpi-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             </div>
-            <div class="kpi-val">$<?= number_format($general['avg_order'], 1) ?></div>
+            <div class="kpi-val"><?= fmt_price($general['avg_order'], $cur_symbol, 1, $cur_pfx) ?></div>
             <div class="kpi-lbl">متوسط قيمة الطلب</div>
             <div class="kpi-chg chg-neu">━ متوسط</div>
         </div>
@@ -548,7 +554,7 @@ require_once 'sidebar.php';
                 <div class="dsc-bar-bg"><div class="dsc-bar" style="width:<?= $pct ?>%"></div></div>
                 <div class="dsc-meta">
                     <span class="dsc-qty">×<?= $dish['total_qty'] ?> طلب</span>
-                    <span class="dsc-rev">$<?= number_format($dish['total_revenue'],0) ?></span>
+                    <span class="dsc-rev"><?= fmt_price($dish['total_revenue'], $cur_symbol, 0, $cur_pfx) ?></span>
                 </div>
             </div>
         </div>
@@ -678,7 +684,7 @@ require_once 'sidebar.php';
             <div class="kpi-icon-box" style="background:rgba(34,197,94,.12);color:#22C55E">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             </div>
-            <div class="kpi-val">$<?= number_format($offers_stats['total_offers_revenue'] ?? 0, 0) ?></div>
+            <div class="kpi-val"><?= fmt_price($offers_stats['total_offers_revenue'] ?? 0, $cur_symbol, 0, $cur_pfx) ?></div>
             <div class="kpi-lbl">إيرادات العروض</div>
             <div class="kpi-chg chg-up">↑ إيرادات</div>
         </div>
@@ -701,7 +707,7 @@ require_once 'sidebar.php';
                 ? $offers_stats['total_offers_revenue'] / $offers_stats['total_orders_with_offers']
                 : 0;
             ?>
-            <div class="kpi-val">$<?= number_format($avg_offer, 1) ?></div>
+            <div class="kpi-val"><?= fmt_price($avg_offer, $cur_symbol, 1, $cur_pfx) ?></div>
             <div class="kpi-lbl">متوسط قيمة العرض</div>
             <div class="kpi-chg chg-neu">━ متوسط</div>
         </div>
@@ -725,7 +731,7 @@ require_once 'sidebar.php';
             <div class="cat-rbar-bg"><div class="cat-rbar" style="width:<?= round($pct) ?>%"></div></div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:60px;">
                 <span class="cat-rqty">×<?= $offer['total_qty'] ?></span>
-                <span style="font-size:10px;color:var(--ink2);font-weight:600;">$<?= number_format($offer['total_revenue'],0) ?></span>
+                <span style="font-size:10px;color:var(--ink2);font-weight:600;"><?= fmt_price($offer['total_revenue'], $cur_symbol, 0, $cur_pfx) ?></span>
             </div>
         </div>
         <?php endforeach; ?>
