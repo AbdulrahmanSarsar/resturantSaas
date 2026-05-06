@@ -399,9 +399,12 @@ PLAN_RANK = ['basic' => 1, 'advanced' => 2, 'premium' => 3];
 
 ## 🚧 المراحل المتبقية
 
-### Phase 9 — Staff Management (الأولوية التالية)
-- [ ] تعديل `profile.php` أو بناء `staff.php` لإضافة dropdown للفرع عند إضافة/تعديل موظف
-- [ ] **حرج:** بدون هاد، أي موظف جديد بـ `branch_id = NULL` ويشوف كل الفروع
+### Phase 9 — Staff Management ✅
+- [x] dropdown الفرع في فورم الإضافة + modal التعديل
+- [x] validation إن الفرع تابع للمطعم (منع tampering)
+- [x] الفرع مطلوب — ما بيضيف موظف بدونه
+- [x] INSERT + UPDATE يشملان branch_id
+- [x] قائمة الموظفين تعرض "⚠️ فرع غير محدد" إذا null
 
 ### Phase 10 — Features Enhancement ✅
 - [x] `ratings.php` branch-aware
