@@ -1,0 +1,3 @@
+# منع الوصول المباشر لكل ملفات config/ عبر HTTP
+# هالمجلد بيشتغل include-only من PHP — ما في سبب يوصله زائر
+Require all denied

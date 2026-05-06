@@ -11,6 +11,12 @@
  *   2. محلياً (XAMPP): استخدم config/database.local.php بدلاً منه
  */
 
+// حماية من الوصول المباشر عبر HTTP
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    http_response_code(403);
+    exit;
+}
+
 // قاعدة البيانات
 define('DB_HOST',  'localhost');
 define('DB_USER',  'u000000000_your_db_user');   // اسم مستخدم قاعدة البيانات
