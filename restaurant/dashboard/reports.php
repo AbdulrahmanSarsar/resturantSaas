@@ -16,15 +16,17 @@ $bf  = $active_branch_id ? "AND branch_id = ?"    : "";
 $bfo = $active_branch_id ? "AND o.branch_id = ?"  : "";
 $bp  = $active_branch_id ? [$active_branch_id]     : [];
 
-$rest = $pdo->prepare("SELECT * FROM restaurants WHERE id=?");
-$rest->execute([$rid]);
-$restaurant = $rest->fetch();
-$cur_symbol   = $restaurant['currency_symbol']   ?? '$';
-$cur_decimals = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix   = in_array($cur_symbol, ['$','€','₺']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($a,$s,$d,$p){ $f=number_format(floatval($a),$d); return $p?$s.$f:$s.' '.$f; }
+// العملة من branch_settings (active_branch_id → fallback لأول فرع)
+$_cur_bid = $active_branch_id;
+if (!$_cur_bid) {
+    $_fb = $pdo->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1 ORDER BY id LIMIT 1");
+    $_fb->execute([$rid]);
+    $_cur_bid = $_fb->fetchColumn() ?: null;
 }
+$cur       = load_branch_currency($pdo, $_cur_bid);
+$cur_symbol   = $cur['symbol'];
+$cur_decimals = $cur['decimals'];
+$cur_prefix   = $cur['prefix'];
 
 $view = $_GET['view'] ?? 'daily';
 

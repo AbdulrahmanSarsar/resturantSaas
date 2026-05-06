@@ -1,27 +1,28 @@
 <?php
 session_start();
 require_once '../../config/database.php';
+require_once __DIR__ . '/../../src/Helpers/PriceHelper.php';
 require_once '../../config/csrf.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 plan_required('advanced'); // نظام الطلبات متاح للمتقدمة + الاحترافية
 
 $rid = $_SESSION['restaurant_id'];
-$rest_data = $pdo->prepare("SELECT currency_symbol, currency_decimals FROM restaurants WHERE id=?");
-$rest_data->execute([$rid]);
-$rest_row = $rest_data->fetch();
-$cur_symbol   = $rest_row['currency_symbol']   ?? '$';
-$cur_decimals = intval($rest_row['currency_decimals'] ?? 2);
-$cur_prefix   = in_array($cur_symbol, ['$', '€', '₺']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $formatted = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
-    }
-}
-
-// ===== Branch Filter =====
 $active_branch_id = $_SESSION['active_branch_id'] ?? null;
+
+// جلب branch_id لتحديد العملة (fallback لأول فرع نشط)
+$_cur_bid = $active_branch_id;
+if (!$_cur_bid) {
+    $_fb = $pdo->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1 ORDER BY id LIMIT 1");
+    $_fb->execute([$rid]);
+    $_cur_bid = $_fb->fetchColumn() ?: null;
+}
+$cur       = load_branch_currency($pdo, $_cur_bid);
+$cur_symbol   = $cur['symbol'];
+$cur_decimals = $cur['decimals'];
+$cur_prefix   = $cur['prefix'];
+
+// Branch Filter (active_branch_id already set above)
 
 // POST: تحديث حالة الطلب
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {

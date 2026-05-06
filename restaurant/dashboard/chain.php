@@ -26,21 +26,14 @@ $rid    = $_SESSION['restaurant_id'];
 $period = intval($_GET['period'] ?? 30);
 if (!in_array($period, [1, 7, 30, 90])) $period = 30;
 
-// ===== بيانات المطعم =====
-$rest = $pdo->prepare("SELECT * FROM restaurants WHERE id = ?");
-$rest->execute([$rid]);
-$restaurant = $rest->fetch();
-
-$cur_symbol   = $restaurant['currency_symbol']   ?? '$';
-$cur_decimals = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix   = in_array($cur_symbol, ['$', '€', '₺']);
-
-if (!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $f = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $f : $symbol . ' ' . $f;
-    }
-}
+// العملة من branch_settings (أول فرع نشط للسلسلة)
+$_fb = $pdo->prepare("SELECT id FROM branches WHERE restaurant_id = ? AND is_active = 1 ORDER BY id LIMIT 1");
+$_fb->execute([$rid]);
+$_cur_bid = $_fb->fetchColumn() ?: null;
+$cur       = load_branch_currency($pdo, $_cur_bid);
+$cur_symbol   = $cur['symbol'];
+$cur_decimals = $cur['decimals'];
+$cur_prefix   = $cur['prefix'];
 
 $date_from = date('Y-m-d', strtotime("-{$period} days"));
 

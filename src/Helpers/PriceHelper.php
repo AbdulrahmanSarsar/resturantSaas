@@ -147,13 +147,55 @@ class PriceHelper
 /**
  * Global backward-compatible function.
  * Maps to the old fmt_price() signature used across the codebase.
- * 
- * @deprecated Use PriceHelper::format() instead
  */
 if (!function_exists('fmt_price')) {
     function fmt_price($amount, $symbol = '$', $decimals = 2, $is_prefix = true): string
     {
         $formatted = number_format(floatval($amount), $decimals);
         return $is_prefix ? $symbol . $formatted : $formatted . ' ' . $symbol;
+    }
+}
+
+/**
+ * جلب إعدادات العملة من branch_settings حسب branch_id.
+ * يرجع مصفوفة جاهزة للاستخدام مع fmt_price().
+ *
+ * استخدام:
+ *   $cur = load_branch_currency($pdo, $branch_id);
+ *   echo fmt_price(1500, $cur['symbol'], $cur['decimals'], $cur['prefix']);
+ */
+if (!function_exists('load_branch_currency')) {
+    function load_branch_currency(PDO $pdo, ?int $branch_id): array
+    {
+        static $cache = [];
+        $key = (string)$branch_id;
+
+        if (isset($cache[$key])) return $cache[$key];
+
+        $row = null;
+        if ($branch_id) {
+            $stmt = $pdo->prepare(
+                "SELECT currency_symbol, currency_symbol_en, currency_decimals
+                 FROM branch_settings WHERE branch_id = ? LIMIT 1"
+            );
+            $stmt->execute([$branch_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        $prefixes  = ['$', '€', '₺', '£', '¥'];
+        $symbol    = ($row['currency_symbol']    ?? null) ?: '$';
+        $symbol_en = ($row['currency_symbol_en'] ?? null) ?: $symbol;
+        $decimals  = intval($row['currency_decimals'] ?? 2);
+
+        $result = [
+            'symbol'     => $symbol,
+            'symbol_en'  => $symbol_en,
+            'decimals'   => $decimals,
+            'prefix'     => in_array($symbol,    $prefixes, true),
+            'prefix_en'  => in_array($symbol_en, $prefixes, true),
+        ];
+
+        $cache[$key] = $result;
+        return $result;
     }
 }

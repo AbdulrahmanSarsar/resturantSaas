@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../config/database.php';
 
 $slug     = $_GET['slug']  ?? '';
@@ -8,21 +8,6 @@ $stmt = $pdo->prepare("SELECT * FROM restaurants WHERE slug=? AND is_active=1");
 $stmt->execute([$slug]);
 $restaurant = $stmt->fetch();
 if(!$restaurant) die('غير موجود');
-
-
-// ===== العملة =====
-$cur_symbol    = $restaurant['currency_symbol']    ?? '$';
-$cur_symbol_en = $restaurant['currency_symbol_en'] ?? $restaurant['currency_symbol'] ?? '$';
-$cur_decimals  = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix    = in_array($cur_symbol, ['$', '\u20ac', '\u20ba']);
-$cur_prefix_en = in_array($cur_symbol_en, ['$', '\u20ac', '\u20ba']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $formatted = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
-    }
-}
-
 
 $order = $pdo->prepare("SELECT * FROM orders WHERE id=? AND restaurant_id=?");
 $order->execute([$order_id, $restaurant['id']]);
@@ -44,18 +29,15 @@ $items = $items->fetchAll();
 
 $primary   = '#FF6B35';
 $secondary = '#F7C59F';
-// [removed] شام كاش — الدفع نقدي للكاشير فقط حالياً
 
-// ===== العملة =====
-$cur_symbol   = $restaurant['currency_symbol']   ?? '$';
-$cur_decimals = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix   = in_array($cur_symbol, ['$', '€', '₺']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $formatted = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
-    }
-}
+// ===== العملة من branch_settings حسب فرع الطلب =====
+require_once __DIR__ . '/../src/Helpers/PriceHelper.php';
+$cur       = load_branch_currency($pdo, $order['branch_id'] ?? null);
+$cur_symbol    = $cur['symbol'];
+$cur_symbol_en = $cur['symbol_en'];
+$cur_decimals  = $cur['decimals'];
+$cur_prefix    = $cur['prefix'];
+$cur_prefix_en = $cur['prefix_en'];
 
 $subtotal = array_sum(array_map(fn($i) => $i['dish_price'] * $i['quantity'], $items));
 $discount = floatval($order['discount_amount'] ?? 0);
@@ -264,8 +246,8 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
                 <?php endif; ?>
                 <?= htmlspecialchars($item['dish_name']) ?>
             </div>
-            <div class="inv-item-unit" data-price="<?= number_format($item['dish_price'],2) ?>">
-                $<?= number_format($item['dish_price'],2) ?> <span class="unit-label">/ الوحدة</span>
+            <div class="inv-item-unit" data-price="<?= number_format($item['dish_price'],$cur_decimals) ?>">
+                <?= fmt_price($item['dish_price'], $cur_symbol, $cur_decimals, $cur_prefix) ?> <span class="unit-label">/ الوحدة</span>
             </div>
             <?php if(!empty($item['options'])): ?>
             <?php $opts = json_decode($item['options'], true) ?? []; ?>
@@ -278,18 +260,18 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
             <?php endif; ?>
             <?php endif; ?>
         </div>
-        <div class="inv-item-total">$<?= number_format($item['dish_price']*$item['quantity'],2) ?></div>
+        <div class="inv-item-total"><?= fmt_price($item['dish_price']*$item['quantity'], $cur_symbol, $cur_decimals, $cur_prefix) ?></div>
     </div>
     <?php endforeach; ?>
     <div class="inv-totals">
         <div class="inv-total-row">
             <span class="inv-total-label" id="lblItemsSubtotal" data-ar="المجموع الفرعي" data-en="Subtotal">المجموع الفرعي</span>
-            <span class="inv-total-value">$<?= number_format($subtotal,2) ?></span>
+            <span class="inv-total-value"><?= fmt_price($subtotal, $cur_symbol, $cur_decimals, $cur_prefix) ?></span>
         </div>
         <?php if($discount > 0): ?>
         <div class="inv-total-row">
             <span class="inv-total-label" id="lblDiscount">خصم الكوبون</span>
-            <span class="inv-total-value discount">-$<?= number_format($discount,2) ?></span>
+            <span class="inv-total-value discount">-<?= fmt_price($discount, $cur_symbol, $cur_decimals, $cur_prefix) ?></span>
         </div>
         <?php endif; ?>
     </div>
@@ -299,7 +281,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
         <div class="inv-total-row">
             <span class="inv-total-label" id="lblSubtotal"
                   data-ar="المجموع الفرعي" data-en="Subtotal">المجموع الفرعي</span>
-            <span class="inv-total-value">$<?= number_format($subtotal_before_tax,2) ?></span>
+            <span class="inv-total-value"><?= fmt_price($subtotal_before_tax, $cur_symbol, $cur_decimals, $cur_prefix) ?></span>
         </div>
         <?php foreach($order_taxes as $otax): ?>
         <div class="inv-total-row">
@@ -310,10 +292,10 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
                     <?= htmlspecialchars($otax['name']) ?>
                 </span>
                 <span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;background:rgba(99,102,241,.12);color:#818CF8;">
-                    <?= $otax['type']==='percentage' ? $otax['value'].'%' : '$'.number_format($otax['value'],2) ?>
+                    <?= $otax['type']==='percentage' ? $otax['value'].'%' : fmt_price($otax['value'], $cur_symbol, $cur_decimals, $cur_prefix) ?>
                 </span>
             </span>
-            <span class="inv-total-value" style="color:#818CF8;">+$<?= number_format($otax['amount'],2) ?></span>
+            <span class="inv-total-value" style="color:#818CF8;">+<?= fmt_price($otax['amount'], $cur_symbol, $cur_decimals, $cur_prefix) ?></span>
         </div>
         <?php endforeach; ?>
         <div style="height:1px;background:var(--line);margin:4px 0 8px;"></div>
@@ -321,7 +303,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
     <?php endif; ?>
     <div class="inv-grand-row">
         <span class="inv-grand-label" id="lblTotal" data-ar="الإجمالي" data-en="Total">الإجمالي</span>
-        <span class="inv-grand-amount">$<?= number_format($order['total_price'],2) ?></span>
+        <span class="inv-grand-amount"><?= fmt_price($order['total_price'], $cur_symbol, $cur_decimals, $cur_prefix) ?></span>
     </div>
 </div>
 

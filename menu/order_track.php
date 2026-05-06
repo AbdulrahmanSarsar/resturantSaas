@@ -15,18 +15,14 @@ $order = $stmt->fetch();
 if(!$order) { http_response_code(404); die('الطلب غير موجود'); }
 $display_order_num = $order['branch_order_number'] ?? $order['restaurant_order_number'] ?? $order_id;
 
-// ===== العملة =====
-$cur_symbol    = $restaurant['currency_symbol']    ?? '$';
-$cur_symbol_en = $restaurant['currency_symbol_en'] ?? $restaurant['currency_symbol'] ?? '$';
-$cur_decimals  = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix    = in_array($cur_symbol,    ['$', '€', '₺']);
-$cur_prefix_en = in_array($cur_symbol_en, ['$', '€', '₺']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($amount, $symbol, $decimals, $is_prefix) {
-        $formatted = number_format(floatval($amount), $decimals);
-        return $is_prefix ? $symbol . $formatted : $symbol . ' ' . $formatted;
-    }
-}
+// ===== العملة من branch_settings حسب فرع الطلب =====
+require_once __DIR__ . '/../src/Helpers/PriceHelper.php';
+$cur       = load_branch_currency($pdo, $order['branch_id'] ?? null);
+$cur_symbol    = $cur['symbol'];
+$cur_symbol_en = $cur['symbol_en'];
+$cur_decimals  = $cur['decimals'];
+$cur_prefix    = $cur['prefix'];
+$cur_prefix_en = $cur['prefix_en'];
 
 // ضرائب الطلب
 $order_taxes = [];

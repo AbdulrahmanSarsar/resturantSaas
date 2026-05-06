@@ -36,17 +36,12 @@ try {
     $_SESSION['staff_branch_id'] = null;
 }
 
-// بيانات المطعم (عملة)
-$rest = $pdo->prepare("SELECT * FROM restaurants WHERE id=?");
-$rest->execute([$rid]);
-$restaurant = $rest->fetch();
-$cur_symbol    = $restaurant['currency_symbol']    ?? '$';
-$cur_symbol_en = $restaurant['currency_symbol_en'] ?? '$';
-$cur_decimals  = intval($restaurant['currency_decimals'] ?? 2);
-$cur_prefix    = in_array($cur_symbol, ['$','€','₺']);
-if(!function_exists('fmt_price')) {
-    function fmt_price($a,$s,$d,$p){ $f=number_format(floatval($a),$d); return $p?$s.$f:$s.' '.$f; }
-}
+// العملة من branch_settings حسب فرع الكاشير
+$cur       = load_branch_currency($pdo, $branch_id);
+$cur_symbol    = $cur['symbol'];
+$cur_symbol_en = $cur['symbol_en'];
+$cur_decimals  = $cur['decimals'];
+$cur_prefix    = $cur['prefix'];
 
 // AJAX: تسجيل قبض
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['ajax'])) {
