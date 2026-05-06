@@ -1,3 +1,6 @@
+# Secrets — بيانات الاتصال الحقيقية على السيرفر (لا ترفعه لـ GitHub أبداً)
+config/secrets.php
+
 # Local development overrides — كل مطور بكتب إعداداته
 config/database.local.php
 

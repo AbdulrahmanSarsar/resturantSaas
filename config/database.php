@@ -19,19 +19,37 @@ if ($__is_local) {
 }
 error_reporting(E_ALL);
 
-// تحميل override محلي إذا موجود (config/database.local.php) — مش commit للـ git
+// ============================================================
+// الأولوية: secrets.php (على السيرفر، ما في git) ← env vars ← local override
+// ============================================================
+
+// 1. ملف الأسرار — موجود على السيرفر فقط، محمي بـ .gitignore
+$__secrets = __DIR__ . '/secrets.php';
+if (is_file($__secrets)) {
+    require $__secrets;
+}
+unset($__secrets);
+
+// 2. Override محلي للمطوّر (XAMPP etc.) — يطغى على secrets.php إذا موجود
 $__local_config = __DIR__ . '/database.local.php';
 if ($__is_local && is_file($__local_config)) {
     require $__local_config;
 }
 unset($__local_config, $__is_local);
 
-// defaults — بترتيب: local override → environment → production hardcoded
-if (!defined('DB_HOST'))  define('DB_HOST', 'localhost');
-if (!defined('DB_USER'))  define('DB_USER', 'u628425673_menu_database');
-if (!defined('DB_PASS'))  define('DB_PASS', '3Bood$@r$@r2006');
-if (!defined('DB_NAME'))  define('DB_NAME', 'u628425673_menu_database');
-if (!defined('BASE_URL')) define('BASE_URL', 'https://menu-pro.org');
+// 3. Environment variables — يطغى على كل شي (Hostinger hPanel أو Docker)
+if (getenv('MENUPRO_DB_HOST') !== false) define('DB_HOST',  getenv('MENUPRO_DB_HOST'));
+if (getenv('MENUPRO_DB_USER') !== false) define('DB_USER',  getenv('MENUPRO_DB_USER'));
+if (getenv('MENUPRO_DB_PASS') !== false) define('DB_PASS',  getenv('MENUPRO_DB_PASS'));
+if (getenv('MENUPRO_DB_NAME') !== false) define('DB_NAME',  getenv('MENUPRO_DB_NAME'));
+if (getenv('MENUPRO_BASE_URL')!== false) define('BASE_URL', getenv('MENUPRO_BASE_URL'));
+
+// 4. Fallback — فارغة، لو ما في secrets.php ولا env vars → فشل واضح بدل كلمة سر مكشوفة
+if (!defined('DB_HOST'))  define('DB_HOST',  'localhost');
+if (!defined('DB_USER'))  define('DB_USER',  '');
+if (!defined('DB_PASS'))  define('DB_PASS',  '');
+if (!defined('DB_NAME'))  define('DB_NAME',  '');
+if (!defined('BASE_URL')) define('BASE_URL', 'https://menu.almanarsoft.com');
 
 try {
     $pdo = new PDO(
