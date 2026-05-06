@@ -10,6 +10,9 @@
  *   - نفس التصميم بالضبط
  */
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../src/Helpers/RateLimiter.php';
+
+use MenuPro\Helpers\RateLimiter;
 
 // لو مسجل دخول → روح للداشبورد
 if(isset($_SESSION['restaurant_id'])) {
@@ -17,9 +20,14 @@ if(isset($_SESSION['restaurant_id'])) {
 }
 
 $error = '';
+$_ip   = RateLimiter::getIp();
 
 if($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if(!$auth->validateCsrf()) {
+    // فحص Rate Limit أولاً
+    $rl = RateLimiter::check($pdo, $_ip);
+    if($rl['blocked']) {
+        $error = "كثّرت المحاولات. انتظر {$rl['minutes']} دقيقة وحاول مرة تانية.";
+    } elseif(!$auth->validateCsrf()) {
         $error = 'انتهت صلاحية الجلسة. حدّث الصفحة وحاول مرة تانية.';
     } else {
         $email    = trim($_POST['email'] ?? '');
@@ -28,6 +36,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $auth->attemptWithRoles($email, $password, ['chain_owner', 'restaurant_manager', 'branch_manager']);
 
         if($user) {
+            RateLimiter::clearForIp($pdo, $_ip);
             // تحقق من الاشتراك: restaurant_id أولاً (مضمون)
             // organization_id fallback فقط لو العمود موجود (ما بكل الـ DBs)
             $restId = $user['restaurant_id'] ?? null;
@@ -65,6 +74,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: dashboard/index.php'); exit;
             }
         } else {
+            RateLimiter::recordFailure($pdo, $_ip);
             $error = 'الإيميل أو كلمة السر غلط!';
         }
     }

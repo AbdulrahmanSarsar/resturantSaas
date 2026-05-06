@@ -9,6 +9,9 @@
  *   - نفس التصميم بالضبط
  */
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../src/Helpers/RateLimiter.php';
+
+use MenuPro\Helpers\RateLimiter;
 
 // لو مسجل دخول → وجّه حسب الدور
 if(isset($_SESSION['staff_id'])) {
@@ -19,9 +22,14 @@ if(isset($_SESSION['staff_id'])) {
 }
 
 $error = '';
+$_ip   = RateLimiter::getIp();
 
 if($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if(!$auth->validateCsrf()) {
+    // فحص Rate Limit أولاً
+    $rl = RateLimiter::check($pdo, $_ip);
+    if($rl['blocked']) {
+        $error = "كثّرت المحاولات. انتظر {$rl['minutes']} دقيقة وحاول مرة تانية.";
+    } elseif(!$auth->validateCsrf()) {
         $error = 'انتهت صلاحية الجلسة. حدّث الصفحة وحاول مرة تانية.';
     } else {
         $username = trim($_POST['username'] ?? '');
@@ -30,11 +38,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $auth->attemptWithRoles($username, $password, ['waiter', 'kitchen', 'cashier']);
 
         if($user) {
+            RateLimiter::clearForIp($pdo, $_ip);
             $role = $user['role'];
             if($role === 'kitchen')  { header('Location: kitchen.php'); exit; }
             if($role === 'cashier')  { header('Location: cashier.php'); exit; }
             header('Location: waiter.php'); exit;
         } else {
+            RateLimiter::recordFailure($pdo, $_ip);
             $error = 'اسم المستخدم أو كلمة السر غلط';
         }
     }

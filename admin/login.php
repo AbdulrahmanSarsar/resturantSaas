@@ -9,6 +9,9 @@
  *   - نفس التصميم والواجهة بالضبط
  */
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../src/Helpers/RateLimiter.php';
+
+use MenuPro\Helpers\RateLimiter;
 
 // لو مسجل دخول كأدمن → روح للوحة التحكم
 if(isset($_SESSION['admin_id'])) {
@@ -16,10 +19,14 @@ if(isset($_SESSION['admin_id'])) {
 }
 
 $error = '';
+$_ip   = RateLimiter::getIp();
 
 if($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // تحقق من CSRF
-    if(!$auth->validateCsrf()) {
+    // فحص Rate Limit أولاً (Admin أشد: 5 محاولات)
+    $rl = RateLimiter::check($pdo, $_ip);
+    if($rl['blocked']) {
+        $error = "كثّرت المحاولات. انتظر {$rl['minutes']} دقيقة وحاول مرة تانية.";
+    } elseif(!$auth->validateCsrf()) {
         $error = 'انتهت صلاحية الجلسة. حدّث الصفحة وحاول مرة تانية.';
     } else {
         $email    = trim($_POST['email'] ?? '');
@@ -28,8 +35,10 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $auth->attemptWithRoles($email, $password, ['super_admin']);
 
         if($user) {
+            RateLimiter::clearForIp($pdo, $_ip);
             header('Location: index.php'); exit;
         } else {
+            RateLimiter::recordFailure($pdo, $_ip);
             $error = 'الإيميل أو كلمة السر غلط!';
         }
     }
