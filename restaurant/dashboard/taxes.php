@@ -2,6 +2,7 @@
 session_start();
 require_once '../../config/database.php';
 require_once '../../config/csrf.php';
+require_once '../../src/Helpers/PriceHelper.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 plan_required('advanced'); // إدارة الضرائب من ميزات الباقة المتقدمة
@@ -22,6 +23,12 @@ if ($active_branch_id) {
         if ($b['id'] == $active_branch_id) { $active_branch_name = $b['name']; break; }
     }
 }
+
+// ===== Currency =====
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
 
 // Helper: تحقق إن الفرع تبع هالمطعم
 $validate_branch = function($branch_id) use ($pdo, $rid) {
@@ -296,7 +303,7 @@ require_once 'sidebar.php';
                         ٪ نسبة مئوية
                     </div>
                     <div class="type-btn" id="addBtnFix" onclick="setAddType('fixed')">
-                        $ مبلغ ثابت
+                        <?= $cur_symbol ?> مبلغ ثابت
                     </div>
                 </div>
             </div>
@@ -349,13 +356,13 @@ require_once 'sidebar.php';
                 <?php endif; ?>
             </div>
             <span class="tax-badge <?= $tax['type']==='percentage'?'pct':'fix' ?>">
-                <?= $tax['type']==='percentage' ? '٪ نسبة' : '$ ثابت' ?>
+                <?= $tax['type']==='percentage' ? '٪ نسبة' : htmlspecialchars($cur_symbol) . ' ثابت' ?>
             </span>
         </div>
 
         <div class="tax-value">
             <?= number_format($tax['value'], $tax['value'] == floor($tax['value']) ? 0 : 2) ?>
-            <span class="tax-value-unit"><?= $tax['type']==='percentage' ? '%' : '$' ?></span>
+            <span class="tax-value-unit"><?= $tax['type']==='percentage' ? '%' : htmlspecialchars($cur_symbol) ?></span>
         </div>
 
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -421,7 +428,7 @@ require_once 'sidebar.php';
                 <label>نوع الضريبة</label>
                 <div class="type-toggle">
                     <div class="type-btn" id="editBtnPct" onclick="setEditType('percentage')">٪ نسبة مئوية</div>
-                    <div class="type-btn" id="editBtnFix" onclick="setEditType('fixed')">$ مبلغ ثابت</div>
+                    <div class="type-btn" id="editBtnFix" onclick="setEditType('fixed')"><?= $cur_symbol ?> مبلغ ثابت</div>
                 </div>
             </div>
             <div class="form-group">
@@ -478,7 +485,7 @@ function setAddType(type) {
     document.getElementById('addTypeVal').value = type;
     document.getElementById('addBtnPct').classList.toggle('active', type==='percentage');
     document.getElementById('addBtnFix').classList.toggle('active', type==='fixed');
-    document.getElementById('addValueLabel').textContent = type==='percentage' ? 'القيمة (٪)' : 'القيمة ($)';
+    document.getElementById('addValueLabel').textContent = type==='percentage' ? 'القيمة (٪)' : `القيمة (${CUR_SYMBOL})`;
     const inp = document.getElementById('addValueInput');
     inp.max = type==='percentage' ? 100 : '';
     inp.placeholder = type==='percentage' ? 'مثال: 10' : 'مثال: 2.50';
@@ -500,7 +507,7 @@ function setEditType(type) {
     document.getElementById('editTypeVal').value = type;
     document.getElementById('editBtnPct').classList.toggle('active', type==='percentage');
     document.getElementById('editBtnFix').classList.toggle('active', type==='fixed');
-    document.getElementById('editValueLabel').textContent = type==='percentage' ? 'القيمة (٪)' : 'القيمة ($)';
+    document.getElementById('editValueLabel').textContent = type==='percentage' ? 'القيمة (٪)' : `القيمة (${CUR_SYMBOL})`;
 }
 
 // ===== DELETE =====
@@ -513,6 +520,8 @@ function confirmDeleteTax(id, name) {
 // ===== SIMULATOR =====
 const TAXES = <?= json_encode(array_filter($taxes, fn($t) => $t['is_active']), JSON_UNESCAPED_UNICODE) ?>;
 
+const CUR_SYMBOL = <?= json_encode($cur_symbol) ?>;
+
 function runSim() {
     const amount = parseFloat(document.getElementById('simAmount').value) || 0;
     const container = document.getElementById('simResults');
@@ -520,7 +529,7 @@ function runSim() {
 
     let html = `<div class="tax-sim-row">
         <span class="tax-sim-label">مجموع الأصناف</span>
-        <span class="tax-sim-value">$${amount.toFixed(2)}</span>
+        <span class="tax-sim-value">${CUR_SYMBOL}${amount.toFixed(2)}</span>
     </div>`;
 
     let totalTax = 0;
@@ -531,15 +540,15 @@ function runSim() {
             : parseFloat(tax.value);
         totalTax += taxAmt;
         html += `<div class="tax-sim-row">
-            <span class="tax-sim-label">${tax.name}${tax.type==='percentage'?` (${tax.value}%)`:` (ثابت $${parseFloat(tax.value).toFixed(2)})`}</span>
-            <span class="tax-sim-value" style="color:#818CF8;">+$${taxAmt.toFixed(2)}</span>
+            <span class="tax-sim-label">${tax.name}${tax.type==='percentage'?` (${tax.value}%)`:` (ثابت ${CUR_SYMBOL}${parseFloat(tax.value).toFixed(2)})`}</span>
+            <span class="tax-sim-value" style="color:#818CF8;">+${CUR_SYMBOL}${taxAmt.toFixed(2)}</span>
         </div>`;
     });
 
     const grand = amount + totalTax;
     html += `<div class="tax-sim-row" style="margin-top:4px;">
         <span class="tax-sim-label" style="font-weight:800;color:var(--ink);">المجموع الكلي</span>
-        <span class="tax-sim-value tax-sim-total">$${grand.toFixed(2)}</span>
+        <span class="tax-sim-value tax-sim-total">${CUR_SYMBOL}${grand.toFixed(2)}</span>
     </div>`;
 
     container.innerHTML = html;

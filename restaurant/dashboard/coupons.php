@@ -2,6 +2,7 @@
 session_start();
 require_once '../../config/database.php';
 require_once '../../config/csrf.php';
+require_once '../../src/Helpers/PriceHelper.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) {
     header('Location: ../login.php'); exit;
@@ -11,6 +12,12 @@ plan_required('advanced'); // الكوبونات متاحة للمتقدمة + �
 $rid = $_SESSION['restaurant_id'];
 $active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $success = ''; $error = '';
+
+// ===== Currency =====
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
 
 // تحقق إن branch_id column موجود (graceful fallback في حال ما تم الـ migration بعد)
 $has_branch_col = false;
@@ -549,7 +556,7 @@ require_once 'sidebar.php';
                         <?= $c['discount_value'] ?>%
                         <span>خصم</span>
                     <?php else: ?>
-                        <?= $c['discount_value'] ?> $
+                        <?= $c['discount_value'] ?> <?= htmlspecialchars($cur_symbol) ?>
                         <span>خصم</span>
                     <?php endif; ?>
                 </div>
@@ -570,7 +577,7 @@ require_once 'sidebar.php';
                     <?php if($c['min_order'] > 0): ?>
                     <span class="coup-chip">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
-                        حد أدنى <?= $c['min_order'] ?> $
+                        حد أدنى <?= $c['min_order'] ?> <?= htmlspecialchars($cur_symbol) ?>
                     </span>
                     <?php endif; ?>
 

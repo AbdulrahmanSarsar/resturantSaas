@@ -2,12 +2,20 @@
 session_start();
 require_once '../../config/database.php';
 require_once '../../config/csrf.php';
+require_once '../../src/Helpers/PriceHelper.php';
 require_once 'plan_guard.php';
 if(!isset($_SESSION['restaurant_id'])) { header('Location: ../login.php'); exit; }
 plan_required('advanced'); // العروض متاحة للمتقدمة + الاحترافية
-$rid     = $_SESSION['restaurant_id'];
+$rid              = $_SESSION['restaurant_id'];
+$active_branch_id = $_SESSION['active_branch_id'] ?? null;
 $success = '';
 $error   = '';
+
+// ===== Currency =====
+$cur        = load_branch_currency($pdo, $active_branch_id);
+$cur_symbol = $cur['symbol'];
+$cur_dec    = $cur['decimals'];
+$cur_pfx    = $cur['prefix'];
 
 // ===== POST HANDLER =====
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -256,7 +264,7 @@ require_once 'sidebar.php';
             <?php endif; ?>
 
             <?php if($offer['type']==='combo' && $offer['combo_price']): ?>
-            <div class="offer-combo-price">$<?= number_format($offer['combo_price'],2) ?></div>
+            <div class="offer-combo-price"><?= fmt_price($offer['combo_price'], $cur_symbol, $cur_dec, $cur_pfx) ?></div>
             <?php endif; ?>
 
             <div class="offer-items-row">
@@ -403,6 +411,7 @@ require_once 'sidebar.php';
 
 <script>
 const ALL_DISHES = <?= json_encode(array_map(fn($d)=>['id'=>$d['id'],'name'=>$d['name'],'price'=>$d['price']],$all_dishes), JSON_UNESCAPED_UNICODE) ?>;
+const CUR_SYMBOL = <?= json_encode($cur_symbol) ?>;
 let currentOfferType = 'bxgy';
 
 function setOfferType(type) {
@@ -436,7 +445,7 @@ function addOfferItemRow(data) {
     row.className = 'oib-row';
 
     const dishOpts = ALL_DISHES.map(d =>
-        `<option value="${d.id}" ${data?.dish_id==d.id?'selected':''}>${d.name} — $${parseFloat(d.price).toFixed(2)}</option>`
+        `<option value="${d.id}" ${data?.dish_id==d.id?'selected':''}>${d.name} — ${CUR_SYMBOL}${parseFloat(d.price).toFixed(2)}</option>`
     ).join('');
 
     row.innerHTML = `

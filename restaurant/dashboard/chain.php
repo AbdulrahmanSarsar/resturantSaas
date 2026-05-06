@@ -299,7 +299,7 @@ require_once __DIR__ . '/sidebar.php';
     <div class="chain-header">
         <div>
             <div class="chain-title">لوحة السلسلة 🏢</div>
-            <div class="chain-sub"><?= htmlspecialchars($restaurant['name']) ?> · <?= $active_count ?> فرع نشط · آخر <?= $period ?> يوم</div>
+            <div class="chain-sub"><?= htmlspecialchars($restaurant_data['name']) ?> · <?= $active_count ?> فرع نشط · آخر <?= $period ?> يوم</div>
         </div>
         <div class="period-tabs">
             <?php foreach ([1 => 'اليوم', 7 => '7 أيام', 30 => '30 يوم', 90 => '3 أشهر'] as $p => $lbl): ?>
