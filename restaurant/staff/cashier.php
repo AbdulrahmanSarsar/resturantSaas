@@ -36,12 +36,22 @@ try {
     $_SESSION['staff_branch_id'] = null;
 }
 
-// العملة من branch_settings حسب فرع الكاشير
+// العملة + شام كاش من branch_settings حسب فرع الكاشير
 $cur       = load_branch_currency($pdo, $branch_id);
 $cur_symbol    = $cur['symbol'];
 $cur_symbol_en = $cur['symbol_en'];
 $cur_decimals  = $cur['decimals'];
 $cur_prefix    = $cur['prefix'];
+
+$shamcash_enabled = false;
+if ($branch_id) {
+    $sc = $pdo->prepare("SELECT shamcash_enabled FROM branch_settings WHERE branch_id = ? LIMIT 1");
+    $sc->execute([$branch_id]);
+    $shamcash_enabled = (bool)($sc->fetchColumn());
+}
+
+// اسم المطعم من الـ session (يُعيّنه AuthMiddleware عند تسجيل الدخول)
+$rest_name = $_SESSION['staff_rest_name'] ?? '';
 
 // AJAX: تسجيل قبض
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['ajax'])) {
@@ -128,7 +138,7 @@ $stats = $today_stats->fetch();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <?= csrf_meta() ?>
-<title>الكاشير — <?= htmlspecialchars($restaurant['name']) ?></title>
+<title>الكاشير — <?= htmlspecialchars($rest_name) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -211,7 +221,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
 
 <div class="topbar">
     <div class="topbar-brand">
-        💰 <?= htmlspecialchars($restaurant['name']) ?>
+        💰 <?= htmlspecialchars($rest_name) ?>
     </div>
     <div class="topbar-role">
         <span class="role-badge">🧾 كاشير</span>
@@ -293,7 +303,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--ink);min-
                     <span class="pay-btn-icon">💳</span>
                     كارت
                 </button>
-                <?php if($restaurant['shamcash_enabled']): ?>
+                <?php if($shamcash_enabled): ?>
                 <button class="pay-btn shamcash" onclick="selectMethod(this,'shamcash',<?= $o['id'] ?>)">
                     <span class="pay-btn-icon">📱</span>
                     شام كاش
