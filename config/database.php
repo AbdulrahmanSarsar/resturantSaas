@@ -69,6 +69,12 @@ try {
     die('تعذّر الاتصال بقاعدة البيانات حالياً. حاول بعد قليل.');
 }
 
+// ===== Default timezone (Damascus UTC+3) =====
+// Hostinger server OS = UTC+2; نضبط دمشق كـ default لكل الصفحات.
+// صفحات المطعم تتجاوزه لاحقاً بـ apply_timezone() إذا اختار المطعم timezone مختلف.
+date_default_timezone_set('Asia/Damascus');
+try { $pdo->exec("SET time_zone = '+03:00'"); } catch (Exception $e) {}
+
 // ===== CSRF helpers: auto-load =====
 // يضمن توفر csrf_field/csrf_token/csrf_require/csrf_meta لكل صفحة
 // بتحمّل database.php، بدون ما كل صفحة تعمل require يدوي.
