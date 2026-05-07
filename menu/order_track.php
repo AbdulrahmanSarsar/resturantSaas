@@ -9,6 +9,9 @@ $stmt->execute([$slug]);
 $restaurant = $stmt->fetch();
 if(!$restaurant) { http_response_code(404); die('غير موجود'); }
 
+if (!function_exists('apply_timezone')) { require_once __DIR__ . '/../src/Helpers/PriceHelper.php'; }
+apply_timezone($pdo, $restaurant['timezone'] ?? 'Asia/Damascus');
+
 $stmt = $pdo->prepare("SELECT o.* FROM orders o WHERE o.id=? AND o.restaurant_id=?");
 $stmt->execute([$order_id, $restaurant['id']]);
 $order = $stmt->fetch();

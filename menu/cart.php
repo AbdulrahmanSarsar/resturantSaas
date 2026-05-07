@@ -21,6 +21,10 @@ if(!$restaurant) { http_response_code(404); die('غير موجود'); }
 
 $rid = $restaurant['id'];
 
+// تطبيق المنطقة الزمنية — يضمن إن NOW() تحفظ الطلب بتوقيت المطعم الصح
+if (!function_exists('apply_timezone')) { require_once __DIR__ . '/../src/Helpers/PriceHelper.php'; }
+apply_timezone($pdo, $restaurant['timezone'] ?? 'Asia/Damascus');
+
 // ===== gate: نظام الطلبات للباقة الاحترافية فقط =====
 if (!restaurant_has_feature($rid, 'orders')) {
     http_response_code(403);

@@ -9,6 +9,9 @@ $stmt->execute([$slug]);
 $restaurant = $stmt->fetch();
 if(!$restaurant) die('غير موجود');
 
+if (!function_exists('apply_timezone')) { require_once __DIR__ . '/../src/Helpers/PriceHelper.php'; }
+apply_timezone($pdo, $restaurant['timezone'] ?? 'Asia/Damascus');
+
 // gate: التقييمات للباقة المتقدمة فما فوق
 if (!restaurant_has_feature((int)$restaurant['id'], 'ratings')) {
     header("Location: " . BASE_URL . "/menu/$slug/invoice/$order_id");
