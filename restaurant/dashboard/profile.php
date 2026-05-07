@@ -68,18 +68,23 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
         $currency_symbol    = trim($_POST['currency_symbol']    ?? '$');
         $currency_symbol_en = trim($_POST['currency_symbol_en'] ?? '$');
         $currency_decimals  = intval($_POST['currency_decimals'] ?? 2);
+        $timezone           = trim($_POST['timezone']           ?? 'Asia/Damascus');
+        // تحقق إن المنطقة الزمنية صحيحة، وإلا ارجع للافتراضي
+        if (!@timezone_open($timezone)) $timezone = 'Asia/Damascus';
 
         $pdo->prepare("UPDATE restaurants SET
             name=?, phone=?, address=?, logo=?,
             welcome_message=?, welcome_message_en=?,
             instagram=?, facebook=?, whatsapp=?, twitter=?, tiktok=?,
-            currency_code=?, currency_symbol=?, currency_symbol_en=?, currency_decimals=?
+            currency_code=?, currency_symbol=?, currency_symbol_en=?, currency_decimals=?,
+            timezone=?
             WHERE id=?")
             ->execute([
                 $name, $phone, $address, $logo,
                 $welcome_message, $welcome_message_en,
                 $instagram, $facebook, $whatsapp, $twitter, $tiktok,
                 $currency_code, $currency_symbol, $currency_symbol_en, $currency_decimals,
+                $timezone,
                 $rid
             ]);
 
@@ -626,6 +631,86 @@ input[type=color] {
         document.getElementById('currencyDecimals').addEventListener('input', updatePreview);
         updatePreview();
         </script>
+
+        <!-- المنطقة الزمنية -->
+        <div class="fc full">
+            <div class="fc-head">
+                <div class="fc-head-icon" style="background:rgba(99,102,241,0.12);color:#6366F1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <span class="fc-title">المنطقة الزمنية</span>
+            </div>
+            <div class="fc-body">
+                <?php
+                $current_tz = $restaurant['timezone'] ?? 'Asia/Damascus';
+                $tz_groups = [
+                    'الدول العربية' => [
+                        'Asia/Damascus'      => 'سوريا — دمشق (+03:00)',
+                        'Asia/Riyadh'        => 'السعودية — الرياض (+03:00)',
+                        'Asia/Kuwait'        => 'الكويت (+03:00)',
+                        'Asia/Baghdad'       => 'العراق — بغداد (+03:00)',
+                        'Asia/Qatar'         => 'قطر — الدوحة (+03:00)',
+                        'Asia/Bahrain'       => 'البحرين (+03:00)',
+                        'Asia/Aden'          => 'اليمن — عدن (+03:00)',
+                        'Africa/Khartoum'    => 'السودان — الخرطوم (+03:00)',
+                        'Asia/Dubai'         => 'الإمارات — دبي (+04:00)',
+                        'Asia/Muscat'        => 'عُمان — مسقط (+04:00)',
+                        'Asia/Amman'         => 'الأردن — عمّان (+03:00)',
+                        'Asia/Beirut'        => 'لبنان — بيروت (+02:00)',
+                        'Africa/Cairo'       => 'مصر — القاهرة (+02:00)',
+                        'Africa/Tripoli'     => 'ليبيا — طرابلس (+02:00)',
+                        'Africa/Tunis'       => 'تونس (+01:00)',
+                        'Africa/Algiers'     => 'الجزائر (+01:00)',
+                        'Africa/Casablanca'  => 'المغرب — الدار البيضاء (+01:00)',
+                    ],
+                    'دول أخرى' => [
+                        'Europe/Istanbul'    => 'تركيا — إسطنبول (+03:00)',
+                        'Europe/London'      => 'المملكة المتحدة (+00:00)',
+                        'Europe/Paris'       => 'فرنسا — باريس (+01:00)',
+                        'America/New_York'   => 'الولايات المتحدة — نيويورك (-05:00)',
+                        'America/Los_Angeles'=> 'الولايات المتحدة — لوس أنجلوس (-08:00)',
+                        'UTC'                => 'UTC (+00:00)',
+                    ],
+                ];
+                ?>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>اختر المنطقة الزمنية الخاصة بمطعمك</label>
+                    <select name="timezone" style="width:100%;padding:11px 14px;background:var(--bg3);border:1.5px solid var(--line);border-radius:12px;color:var(--ink);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;">
+                        <?php foreach($tz_groups as $group_label => $zones): ?>
+                        <optgroup label="<?= htmlspecialchars($group_label) ?>">
+                            <?php foreach($zones as $tz_val => $tz_label): ?>
+                            <option value="<?= $tz_val ?>" <?= $current_tz === $tz_val ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($tz_label) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <?php endforeach; ?>
+                    </select>
+                    <div style="margin-top:8px;font-size:12px;color:var(--ink2);">
+                        الوقت الحالي لديك:
+                        <strong style="color:var(--p);" id="currentTzTime">—</strong>
+                    </div>
+                </div>
+                <script>
+                (function() {
+                    var sel = document.querySelector('select[name="timezone"]');
+                    var disp = document.getElementById('currentTzTime');
+                    function showTime() {
+                        try {
+                            disp.textContent = new Date().toLocaleTimeString('ar-SA', {
+                                timeZone: sel.value,
+                                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                                hour12: true
+                            }) + ' (' + sel.value + ')';
+                        } catch(e) { disp.textContent = sel.value; }
+                    }
+                    sel.addEventListener('change', showTime);
+                    showTime();
+                    setInterval(showTime, 1000);
+                })();
+                </script>
+            </div>
+        </div>
 
         <!-- Save Button -->
         <div class="fc full" style="background:transparent;border-color:transparent;box-shadow:none;">

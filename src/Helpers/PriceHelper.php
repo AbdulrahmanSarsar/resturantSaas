@@ -204,4 +204,38 @@ if (!function_exists('load_branch_currency')) {
     }
 }
 
+/**
+ * تطبيق المنطقة الزمنية للمطعم على PHP + MySQL session.
+ *
+ * بيستخدم اسم المنطقة الزمنية الكامل (مثل 'Asia/Dubai').
+ * يطبّق التوقيت على:
+ *   1. PHP:  date_default_timezone_set() — يؤثر على date(), time(), strtotime()
+ *   2. MySQL session: SET time_zone — يؤثر على NOW(), CURDATE(), DATE()
+ *
+ * استخدام:
+ *   apply_timezone($pdo, $restaurant['timezone'] ?? 'Asia/Damascus');
+ */
+if (!function_exists('apply_timezone')) {
+    function apply_timezone(PDO $pdo, ?string $timezone): void
+    {
+        $tz = ($timezone && @timezone_open($timezone)) ? $timezone : 'Asia/Damascus';
+
+        date_default_timezone_set($tz);
+
+        // حوّل اسم المنطقة لـ UTC offset بصيغة MySQL (+03:00)
+        $dt     = new DateTime('now', new DateTimeZone($tz));
+        $offset = $dt->getOffset(); // ثوانٍ
+        $sign   = $offset >= 0 ? '+' : '-';
+        $h      = intdiv(abs($offset), 3600);
+        $m      = (abs($offset) % 3600) / 60;
+        $mysql_tz = sprintf("%s%02d:%02d", $sign, $h, $m);
+
+        try {
+            $pdo->exec("SET time_zone = '$mysql_tz'");
+        } catch (Exception $e) {
+            // shared hosting قد لا يدعم تغيير الـ timezone — يتجاهل الخطأ
+        }
+    }
+}
+
 } // end namespace (global)

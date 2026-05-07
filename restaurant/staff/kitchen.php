@@ -18,6 +18,10 @@ if(!isset($_SESSION['staff_id']) || $_SESSION['staff_role'] !== 'kitchen') {
 $rid      = $_SESSION['staff_rest_id'];
 $staff_id = $_SESSION['staff_id'];
 
+// تطبيق المنطقة الزمنية الخاصة بالمطعم
+if (!function_exists('apply_timezone')) { require_once __DIR__ . '/../../src/Helpers/PriceHelper.php'; }
+try { $tz_r = $pdo->prepare("SELECT timezone FROM restaurants WHERE id = ? LIMIT 1"); $tz_r->execute([$rid]); apply_timezone($pdo, $tz_r->fetchColumn() ?: 'Asia/Damascus'); } catch (Exception $e) { apply_timezone($pdo, 'Asia/Damascus'); }
+
 // gate: شاشة المطبخ ميزة الباقة الاحترافية فقط
 staff_feature_or_die($rid, 'staff', 'المطبخ — محجوب');
 

@@ -22,6 +22,12 @@ $restaurant_data = $pdo->prepare("SELECT * FROM restaurants WHERE id = ?");
 $restaurant_data->execute([$rid]);
 $restaurant_data = $restaurant_data->fetch();
 
+// تطبيق المنطقة الزمنية الخاصة بالمطعم
+if (!function_exists('apply_timezone')) {
+    require_once __DIR__ . '/../../src/Helpers/PriceHelper.php';
+}
+apply_timezone($pdo, $restaurant_data['timezone'] ?? 'Asia/Damascus');
+
 $primary   = '#FF6B35';
 $secondary = '#F7C59F';
 
