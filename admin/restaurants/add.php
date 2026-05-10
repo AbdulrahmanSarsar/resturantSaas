@@ -35,43 +35,24 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
             ->execute([$name,$email,$hashed,$phone,$address,$logo,$slug,$plan,$expiry]);
         $new_id = $pdo->lastInsertId();
 
-        // ✅ إنشاء حساب تسجيل الدخول في users — ديناميكي بحسب الأعمدة الموجودة فعلاً
+        // ✅ إنشاء حساب تسجيل الدخول في users
+        // users schema: id, name(NN), email(UNI), username, password(NN), role(NN), restaurant_id, is_active(def=1), created_at(auto)
         try {
-            $existing_cols = $pdo->query("
-                SELECT COLUMN_NAME FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
-            ")->fetchAll(PDO::FETCH_COLUMN);
-
-            // الأعمدة المحتملة + قيمها — نضيف فقط ما هو موجود بالجدول
-            $candidates = [
-                'name'          => $name,
-                'username'      => $email,   // email كـ username fallback
-                'email'         => $email,
-                'password'      => $hashed,
-                'role'          => 'restaurant_manager',
-                'restaurant_id' => $new_id,
-                'is_active'     => 1,
-                'created_at'    => date('Y-m-d H:i:s'),
-            ];
-
-            $fields = [];
-            foreach ($candidates as $col => $val) {
-                if (in_array($col, $existing_cols)) {
-                    $fields[$col] = $val;
-                }
-            }
-
-            $colList = implode(', ', array_keys($fields));
-            $phList  = implode(', ', array_fill(0, count($fields), '?'));
-            $pdo->prepare("INSERT IGNORE INTO users ($colList) VALUES ($phList)")
-                ->execute(array_values($fields));
+            $pdo->prepare("
+                INSERT IGNORE INTO users (name, email, password, role, restaurant_id, is_active)
+                VALUES (?, ?, ?, 'restaurant_manager', ?, 1)
+            ")->execute([$name, $email, $hashed, $new_id]);
         } catch (\Throwable $e) {
             error_log('[MenuPro] users INSERT failed for restaurant ' . $new_id . ': ' . $e->getMessage());
-            // لا نوقف العملية — المطعم اتنشأ، يمكن إضافة المستخدم يدوياً
         }
 
-        $pdo->prepare("INSERT INTO subscriptions (restaurant_id,plan,price,start_date,end_date,is_active) VALUES (?,?,?,CURDATE(),?,1)")
-            ->execute([$new_id,$plan,$_POST['price']??0,$expiry]);
+        // subscriptions — جدول legacy، مغلّف بـ try-catch لأنه قد لا يكون موجوداً
+        try {
+            $pdo->prepare("INSERT INTO subscriptions (restaurant_id,plan,price,start_date,end_date,is_active) VALUES (?,?,?,CURDATE(),?,1)")
+                ->execute([$new_id, $plan, $_POST['price'] ?? 0, $expiry]);
+        } catch (\Throwable $e) {
+            error_log('[MenuPro] subscriptions INSERT failed for restaurant ' . $new_id . ': ' . $e->getMessage());
+        }
         header('Location: index.php?success=1'); exit;
     }
 }
