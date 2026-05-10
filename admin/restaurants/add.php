@@ -35,12 +35,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
             ->execute([$name,$email,$hashed,$phone,$address,$logo,$slug,$plan,$expiry]);
         $new_id = $pdo->lastInsertId();
 
-        // ✅ إنشاء حساب تسجيل الدخول في users
-        // users schema: id, name(NN), email(UNI), username, password(NN), role(NN), restaurant_id, is_active(def=1), created_at(auto)
+        // ✅ إنشاء/تحديث حساب تسجيل الدخول في users
+        // ON DUPLICATE KEY UPDATE: لو الإيميل موجود مسبقاً (من محاولة سابقة أو SQL migration)
+        // نحدّث كلمة السر وبيانات المطعم بدل ما نتجاهل الـ INSERT ونخلي كلمة سر قديمة
         try {
             $pdo->prepare("
-                INSERT IGNORE INTO users (name, email, password, role, restaurant_id, is_active)
+                INSERT INTO users (name, email, password, role, restaurant_id, is_active)
                 VALUES (?, ?, ?, 'restaurant_manager', ?, 1)
+                ON DUPLICATE KEY UPDATE
+                    password      = VALUES(password),
+                    restaurant_id = VALUES(restaurant_id),
+                    name          = VALUES(name),
+                    role          = 'restaurant_manager',
+                    is_active     = 1
             ")->execute([$name, $email, $hashed, $new_id]);
         } catch (\Throwable $e) {
             error_log('[MenuPro] users INSERT failed for restaurant ' . $new_id . ': ' . $e->getMessage());
