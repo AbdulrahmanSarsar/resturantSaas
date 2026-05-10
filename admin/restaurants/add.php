@@ -28,9 +28,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
                 move_uploaded_file($_FILES['logo']['tmp_name'], '../../assets/uploads/'.$logo);
             }
         }
+        // حفظ الهاش مرة واحدة — يُستخدم في restaurants + users
+        $hashed = password_hash($password, PASSWORD_DEFAULT);
+
         $pdo->prepare("INSERT INTO restaurants (name,email,password,phone,address,logo,slug,subscription_plan,subscription_expiry,is_active) VALUES (?,?,?,?,?,?,?,?,?,1)")
-            ->execute([$name,$email,password_hash($password,PASSWORD_DEFAULT),$phone,$address,$logo,$slug,$plan,$expiry]);
+            ->execute([$name,$email,$hashed,$phone,$address,$logo,$slug,$plan,$expiry]);
         $new_id = $pdo->lastInsertId();
+
+        // ✅ إنشاء حساب تسجيل الدخول في جدول users (restaurant/login.php يقرأ منه)
+        $pdo->prepare("
+            INSERT INTO users (name, email, password, role, restaurant_id, is_active, created_at)
+            VALUES (?, ?, ?, 'restaurant_manager', ?, 1, NOW())
+        ")->execute([$name, $email, $hashed, $new_id]);
+
         $pdo->prepare("INSERT INTO subscriptions (restaurant_id,plan,price,start_date,end_date,is_active) VALUES (?,?,?,CURDATE(),?,1)")
             ->execute([$new_id,$plan,$_POST['price']??0,$expiry]);
         header('Location: index.php?success=1'); exit;

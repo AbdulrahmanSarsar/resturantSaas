@@ -31,12 +31,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if(!empty($_POST['new_password'])) {
-        $pdo->prepare("UPDATE restaurants SET password=? WHERE id=?")
-            ->execute([password_hash($_POST['new_password'], PASSWORD_DEFAULT), $id]);
+        $hashed = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
+        $pdo->prepare("UPDATE restaurants SET password=? WHERE id=?")->execute([$hashed, $id]);
+        // زامن كلمة السر في users أيضاً
+        $pdo->prepare("UPDATE users SET password=? WHERE restaurant_id=? AND role='restaurant_manager'")
+            ->execute([$hashed, $id]);
     }
 
     $pdo->prepare("UPDATE restaurants SET name=?,email=?,phone=?,address=?,logo=?,subscription_plan=?,subscription_expiry=?,is_active=? WHERE id=?")
         ->execute([$name,$email,$phone,$address,$logo,$plan,$expiry,$active,$id]);
+
+    // زامن الاسم والإيميل وحالة النشاط في users
+    $pdo->prepare("UPDATE users SET name=?, email=?, is_active=? WHERE restaurant_id=? AND role='restaurant_manager'")
+        ->execute([$name, $email, $active, $id]);
 
     $success = 'تم حفظ التعديلات!';
     $stmt->execute([$id]); $r = $stmt->fetch();
