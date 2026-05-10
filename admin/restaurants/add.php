@@ -51,6 +51,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
             ")->execute([$name, $email, $hashed, $new_id]);
         } catch (\Throwable $e) {
             error_log('[MenuPro] users INSERT failed for restaurant ' . $new_id . ': ' . $e->getMessage());
+            $error = 'تم إنشاء المطعم لكن فشل إنشاء حساب الدخول: ' . $e->getMessage();
         }
 
         // subscriptions — جدول legacy، مغلّف بـ try-catch لأنه قد لا يكون موجوداً
@@ -60,7 +61,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (\Throwable $e) {
             error_log('[MenuPro] subscriptions INSERT failed for restaurant ' . $new_id . ': ' . $e->getMessage());
         }
-        header('Location: index.php?success=1'); exit;
+        if (empty($error)) {
+            header('Location: index.php?success=1'); exit;
+        }
     }
 }
 
