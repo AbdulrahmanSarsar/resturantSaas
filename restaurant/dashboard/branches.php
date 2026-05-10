@@ -76,9 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($name) {
-            $pdo->prepare("INSERT INTO branches (restaurant_id, name, name_en, slug, address, phone, welcome_message, welcome_message_en, is_active, created_at)
-                VALUES (?,?,?,?,?,?,?,?,1,NOW())")
-                ->execute([$rid, $name, $name_en, $raw_slug, $address, $phone, $welcome, $welcome_en]);
+            $pdo->prepare("INSERT INTO branches (restaurant_id, name, name_en, slug, address, phone, is_active, created_at)
+                VALUES (?,?,?,?,?,?,1,NOW())")
+                ->execute([$rid, $name, $name_en, $raw_slug, $address, $phone]);
         }
         header('Location: branches.php?ok=added');
         exit;
@@ -95,8 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $welcome_en = trim($_POST['welcome_message_en'] ?? '');
 
         if ($name && $bid) {
-            $pdo->prepare("UPDATE branches SET name=?, name_en=?, address=?, phone=?, welcome_message=?, welcome_message_en=? WHERE id=? AND restaurant_id=?")
-                ->execute([$name, $name_en, $address, $phone, $welcome, $welcome_en, $bid, $rid]);
+            $pdo->prepare("UPDATE branches SET name=?, name_en=?, address=?, phone=? WHERE id=? AND restaurant_id=?")
+                ->execute([$name, $name_en, $address, $phone, $bid, $rid]);
         }
         header('Location: branches.php?ok=edited');
         exit;

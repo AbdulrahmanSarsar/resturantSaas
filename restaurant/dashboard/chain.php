@@ -384,7 +384,8 @@ require_once __DIR__ . '/sidebar.php';
         </div>
         <div class="branch-grid">
             <?php
-            $max_rev = max(array_column($branches, 'revenue')) ?: 1;
+            $rev_vals = array_column($branches, 'revenue');
+            $max_rev  = !empty($rev_vals) ? (max($rev_vals) ?: 1) : 1;
             $rank_labels = ['gold', 'silver', 'bronze'];
             $rank_nums   = ['🥇', '🥈', '🥉'];
             ?>
